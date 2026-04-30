@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACES Club — Live Leaderboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="header-row">
+        <div class="header-brand">
+          <span class="header-logo">🎾</span>
+          <div>
+            <div class="header-title">ACES CLUB</div>
+            <div class="header-sub">Live Leaderboard</div>
+          </div>
+        </div>
+        <button id="admin-toggle" title="Admin Login">🔒</button>
+      </div>
+      <div id="admin-bar" class="admin-bar hidden">
+        <span>🔓 Admin Mode Active</span>
+        <button id="admin-logout" class="btn-sm">Logout</button>
+      </div>
+      <div id="mvp-banner" class="mvp-banner hidden"></div>
+      <nav id="main-nav">
+        <button class="tab active" data-tab="leaderboard">Leaderboard</button>
+        <button class="tab" data-tab="schedule">Schedule</button>
+        <button class="tab" data-tab="recent">Recent</button>
+        <button class="tab" data-tab="h2h">H2H</button>
+        <button class="tab" data-tab="tournament">Brackets</button>
+        <button class="tab admin-only hidden" data-tab="players">Players</button>
+        <button class="tab admin-only hidden" data-tab="enter-score">Enter Score</button>
+      </nav>
+    </header>
+
+    <!-- LEADERBOARD -->
+    <section id="leaderboard" class="panel active">
+      <div class="division-tabs">
+        <button class="div-tab active" data-div="all">All</button>
+        <button class="div-tab" data-div="men">Men</button>
+        <button class="div-tab" data-div="women">Women</button>
+      </div>
+      <div class="table-wrap">
+        <table id="leaderboard-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Username</th>
+              <th>W</th>
+              <th>L</th>
+              <th>Win%</th>
+              <th>Sets</th>
+              <th>Games</th>
+              <th>Streak</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PLAYERS (admin) -->
+    <section id="players" class="panel">
+      <h2>Manage Players</h2>
+      <form id="add-player-form">
+        <div class="form-row">
+          <label>Username <input type="text" id="new-player-name" required placeholder="e.g. AceKing23"></label>
+          <label>Division
+            <select id="new-player-div">
+              <option value="men">Men</option>
+              <option value="women">Women</option>
+            </select>
+          </label>
+          <button type="submit" class="btn-primary btn-sm">Add Player</button>
+        </div>
+      </form>
+      <div id="player-roster"></div>
+    </section>
+
+    <!-- SCHEDULE -->
+    <section id="schedule" class="panel">
+      <h2>Upcoming Matches</h2>
+      <form id="schedule-form" class="admin-only hidden">
+        <h3>Schedule a Match</h3>
+        <div class="form-row">
+          <label>Match Type
+            <select id="sched-type" onchange="toggleDoubles()">
+              <option value="singles">Singles</option>
+              <option value="doubles">Doubles</option>
+            </select>
+          </label>
+          <label>Division
+            <select id="sched-div">
+              <option value="men">Men</option>
+              <option value="women">Women</option>
+              <option value="mixed">Mixed</option>
+            </select>
+          </label>
+        </div>
+        <div id="sched-singles-fields">
+          <div class="form-row">
+            <label>Player 1 <input type="text" id="sched-p1" list="player-list" required></label>
+            <label>Player 2 <input type="text" id="sched-p2" list="player-list" required></label>
+          </div>
+        </div>
+        <div id="sched-doubles-fields" class="hidden">
+          <div class="form-row">
+            <label>Team 1 - Player A <input type="text" id="sched-d1a" list="player-list"></label>
+            <label>Team 1 - Player B <input type="text" id="sched-d1b" list="player-list"></label>
+          </div>
+          <div class="form-row">
+            <label>Team 2 - Player A <input type="text" id="sched-d2a" list="player-list"></label>
+            <label>Team 2 - Player B <input type="text" id="sched-d2b" list="player-list"></label>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Date <input type="date" id="sched-date" required></label>
+          <label>Time <input type="time" id="sched-time" required></label>
+          <label>Court <input type="text" id="sched-court" placeholder="e.g. Montpelier Court 1"></label>
+        </div>
+        <button type="submit" class="btn-primary">Schedule Match</button>
+        <p id="sched-msg"></p>
+      </form>
+      <datalist id="player-list"></datalist>
+      <ul id="schedule-list"></ul>
+    </section>
+
+    <!-- ENTER SCORE -->
+    <section id="enter-score" class="panel">
+      <h2>Record a Match</h2>
+      <div id="pending-matches"></div>
+      <hr>
+      <h3>Or enter a quick match</h3>
+      <form id="match-form">
+        <div class="form-row">
+          <label>Match Type
+            <select id="match-type" onchange="toggleMatchDoubles()">
+              <option value="singles">Singles</option>
+              <option value="doubles">Doubles</option>
+            </select>
+          </label>
+        </div>
+        <div id="match-singles-fields">
+          <div class="form-row">
+            <label>Player 1 <input type="text" id="p1" list="player-list" required></label>
+            <label>Player 2 <input type="text" id="p2" list="player-list" required></label>
+          </div>
+        </div>
+        <div id="match-doubles-fields" class="hidden">
+          <div class="form-row">
+            <label>Team 1 - Player A <input type="text" id="md1a" list="player-list"></label>
+            <label>Team 1 - Player B <input type="text" id="md1b" list="player-list"></label>
+          </div>
+          <div class="form-row">
+            <label>Team 2 - Player A <input type="text" id="md2a" list="player-list"></label>
+            <label>Team 2 - Player B <input type="text" id="md2b" list="player-list"></label>
+          </div>
+        </div>
+        <h3>Set Scores</h3>
+        <div id="sets-container">
+          <div class="set-row">
+            <span>Set 1</span>
+            <input type="number" min="0" max="7" class="set-p1" required placeholder="P1/T1">
+            <span>–</span>
+            <input type="number" min="0" max="7" class="set-p2" required placeholder="P2/T2">
+            <input type="number" min="0" max="99" class="set-tb" placeholder="TB">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" id="add-set-btn">+ Set</button>
+          <button type="button" id="remove-set-btn">− Set</button>
+        </div>
+        <div class="form-row">
+          <label>Result Type
+            <select id="result-type">
+              <option value="completed">Completed</option>
+              <option value="walkover">Walkover (W/O)</option>
+              <option value="retirement">Retirement (RET)</option>
+            </select>
+          </label>
+        </div>
+        <button type="submit" class="btn-primary">Submit Match</button>
+        <p id="form-msg"></p>
+      </form>
+    </section>
+
+    <!-- RECENT -->
+    <section id="recent" class="panel">
+      <h2>Recent Matches</h2>
+      <ul id="recent-list"></ul>
+    </section>
+
+    <!-- H2H -->
+    <section id="h2h" class="panel">
+      <h2>Head-to-Head</h2>
+      <div class="form-row">
+        <label>Player A <input type="text" id="h2h-a" list="player-list" placeholder="Username"></label>
+        <label>Player B <input type="text" id="h2h-b" list="player-list" placeholder="Username"></label>
+        <button type="button" id="h2h-btn" class="btn-primary btn-sm">Compare</button>
+      </div>
+      <div id="h2h-result"></div>
+    </section>
+
+    <!-- TOURNAMENT -->
+    <section id="tournament" class="panel">
+      <h2>Tournament Brackets</h2>
+      <form id="tourney-form" class="admin-only hidden">
+        <h3>Create Tournament</h3>
+        <div class="form-row">
+          <label>Name <input type="text" id="tourney-name" required placeholder="e.g. ACES Internal May 2026"></label>
+          <label>Division
+            <select id="tourney-div">
+              <option value="men">Men</option>
+              <option value="women">Women</option>
+              <option value="mixed">Mixed</option>
+            </select>
+          </label>
+          <label>Size
+            <select id="tourney-size">
+              <option value="4">4 players</option>
+              <option value="8" selected>8 players</option>
+              <option value="16">16 players</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-row">
+          <label>Date <input type="date" id="tourney-date" required></label>
+        </div>
+        <div id="tourney-seeds"></div>
+        <button type="button" id="tourney-gen-seeds" class="btn-sm">Generate Seed Slots</button>
+        <button type="submit" class="btn-primary">Create Tournament</button>
+        <p id="tourney-msg"></p>
+      </form>
+      <div id="tourney-list"></div>
+      <div id="bracket-view" class="hidden"></div>
+    </section>
+
+    <!-- ADMIN PIN MODAL -->
+    <div id="pin-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>🔒 Admin Login</h3>
+        <p>Enter the admin PIN to manage ACES leaderboard:</p>
+        <input type="password" id="pin-input" maxlength="6" placeholder="PIN">
+        <div class="modal-actions">
+          <button id="pin-submit" class="btn-primary btn-sm">Login</button>
+          <button id="pin-cancel" class="btn-sm">Cancel</button>
+        </div>
+        <p id="pin-msg"></p>
+        <hr>
+        <details>
+          <summary>First time? Set admin PIN</summary>
+          <input type="password" id="pin-set" maxlength="6" placeholder="Choose a PIN (min 4 digits)">
+          <button id="pin-set-btn" class="btn-sm">Set PIN</button>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleDoubles() {
+      const t = document.getElementById('sched-type').value;
+      document.getElementById('sched-singles-fields').classList.toggle('hidden', t === 'doubles');
+      document.getElementById('sched-doubles-fields').classList.toggle('hidden', t !== 'doubles');
+    }
+    function toggleMatchDoubles() {
+      const t = document.getElementById('match-type').value;
+      document.getElementById('match-singles-fields').classList.toggle('hidden', t === 'doubles');
+      document.getElementById('match-doubles-fields').classList.toggle('hidden', t !== 'doubles');
+    }
+  </script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

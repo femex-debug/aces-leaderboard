@@ -1,0 +1,439 @@
+/* ── ACES Club Leaderboard — Styles ── */
+:root {
+  --green-dark: #0F2D18;
+  --green: #1A7A4A;
+  --green-mid: #2D9E6A;
+  --green-light: #E8F5EE;
+  --gold: #C9A84C;
+  --gold-light: #FDF6E3;
+  --white: #FFFFFF;
+  --black: #111111;
+  --gray: #666666;
+  --light: #F8F8F6;
+  --border: #E0E0E0;
+  --red: #C0392B;
+  --blue: #1A5276;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--light);
+  color: var(--black);
+  min-height: 100vh;
+}
+
+#app { max-width: 900px; margin: 0 auto; padding: 0 0 60px; }
+
+/* ── HEADER ── */
+header {
+  background: var(--green-dark);
+  padding: 16px 20px 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.header-brand { display: flex; align-items: center; gap: 12px; }
+.header-logo { font-size: 28px; }
+.header-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 26px;
+  letter-spacing: 4px;
+  color: var(--white);
+  line-height: 1;
+}
+.header-sub { font-size: 11px; color: var(--gold); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+
+#admin-toggle {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--white);
+  transition: all 0.2s;
+}
+#admin-toggle:hover { background: rgba(255,255,255,0.1); }
+
+.admin-bar {
+  background: rgba(201,168,76,0.15);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.mvp-banner {
+  background: linear-gradient(135deg, var(--gold) 0%, #e6c25a 100%);
+  color: var(--green-dark);
+  text-align: center;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+/* ── NAV ── */
+#main-nav {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  padding-bottom: 0;
+  scrollbar-width: none;
+}
+#main-nav::-webkit-scrollbar { display: none; }
+
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: rgba(255,255,255,0.55);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.tab:hover { color: var(--white); }
+.tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+/* ── PANELS ── */
+.panel { display: none; padding: 20px 16px; }
+.panel.active { display: block; }
+.panel h2 { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; color: var(--green-dark); margin-bottom: 16px; }
+.panel h3 { font-size: 15px; font-weight: 600; color: var(--green-dark); margin: 16px 0 10px; }
+
+/* ── DIVISION TABS ── */
+.division-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.div-tab {
+  padding: 6px 18px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  color: var(--gray);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.div-tab.active { background: var(--green-dark); color: var(--white); border-color: var(--green-dark); }
+
+/* ── LEADERBOARD TABLE ── */
+.table-wrap { overflow-x: auto; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+
+#leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--white);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+#leaderboard-table thead tr {
+  background: var(--green-dark);
+}
+
+#leaderboard-table th {
+  padding: 12px 14px;
+  text-align: left;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  letter-spacing: 1.5px;
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+#leaderboard-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+#leaderboard-table tbody tr:hover { background: var(--green-light); }
+#leaderboard-table tbody tr:last-child { border-bottom: none; }
+
+#leaderboard-table td {
+  padding: 12px 14px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.rank-cell { font-weight: 700; font-size: 15px; color: var(--gray); }
+.rank-1 { color: var(--gold); }
+.rank-2 { color: #888; }
+.rank-3 { color: #a0522d; }
+
+.player-name { font-weight: 600; font-size: 15px; }
+
+.division-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  vertical-align: middle;
+  margin-left: 6px;
+  letter-spacing: 0.5px;
+}
+.badge-men { background: #E6F1FB; color: #0C447C; }
+.badge-women { background: #FCE8F3; color: #7C0C4A; }
+
+.streak-fire { color: #E74C3C; font-weight: 600; font-size: 13px; }
+.streak-ice  { color: #2980B9; font-weight: 600; font-size: 13px; }
+
+@keyframes rankUp {
+  0% { background: rgba(201,168,76,0.3); }
+  100% { background: transparent; }
+}
+.rank-up { animation: rankUp 1.2s ease; }
+
+/* ── FORMS ── */
+.form-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  align-items: flex-end;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex: 1;
+  min-width: 140px;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="password"],
+select {
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  color: var(--black);
+  background: var(--white);
+  transition: border-color 0.15s;
+  width: 100%;
+}
+input:focus, select:focus { outline: none; border-color: var(--green); }
+
+.form-actions { display: flex; gap: 8px; margin: 8px 0 16px; }
+
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.set-row span { font-size: 13px; font-weight: 600; color: var(--gray); min-width: 36px; }
+.set-p1, .set-p2 { width: 60px !important; flex: none !important; min-width: unset !important; }
+.set-tb { width: 60px !important; flex: none !important; min-width: unset !important; }
+
+/* ── BUTTONS ── */
+.btn-primary {
+  background: var(--green);
+  color: var(--white);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: var(--green-mid); }
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  color: var(--gray);
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-sm:hover { border-color: var(--green); color: var(--green); }
+
+/* ── SCHEDULE LIST ── */
+#schedule-list, #recent-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+
+#schedule-list li, #recent-list li {
+  background: var(--white);
+  border-radius: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.match-players { font-weight: 600; font-size: 14px; }
+.match-score { font-weight: 500; color: var(--green); font-size: 14px; }
+.match-meta { font-size: 12px; color: var(--gray); margin-top: 2px; }
+.winner-badge { color: var(--green); font-weight: 700; }
+
+.pending-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+/* ── H2H ── */
+.h2h-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.big { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: var(--green-dark); margin-bottom: 6px; }
+
+/* ── ROSTER ── */
+.roster-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+/* ── TOURNAMENT ── */
+.tourney-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.tourney-card:hover { border-color: var(--green); box-shadow: 0 2px 12px rgba(26,122,74,0.15); }
+.tourney-card h4 { font-size: 15px; font-weight: 600; color: var(--green-dark); margin-bottom: 4px; }
+
+.tourney-champion {
+  background: var(--gold-light);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 600;
+  color: var(--green-dark);
+  margin-bottom: 16px;
+}
+
+.bracket { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 12px; }
+.bracket-round { display: flex; flex-direction: column; gap: 12px; min-width: 160px; }
+.bracket-round h4 { font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 1px; color: var(--gray); margin-bottom: 4px; }
+
+.bracket-match {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.bracket-match.completed { border-color: var(--green); }
+
+.bracket-slot {
+  padding: 8px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.bracket-slot:last-of-type { border-bottom: none; }
+.bracket-slot.winner { background: var(--green-light); font-weight: 700; color: var(--green-dark); }
+.bracket-slot.empty { color: var(--border); }
+
+/* ── MODAL ── */
+.modal {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 999;
+  backdrop-filter: blur(4px);
+}
+.modal-content {
+  background: var(--white);
+  border-radius: 16px;
+  padding: 28px;
+  width: 90%;
+  max-width: 360px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.modal-content h3 { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; color: var(--green-dark); margin-bottom: 8px; }
+.modal-content p { font-size: 13px; color: var(--gray); margin-bottom: 12px; }
+.modal-actions { display: flex; gap: 8px; margin: 12px 0; }
+
+.modal-content details { margin-top: 12px; }
+.modal-content summary { font-size: 12px; color: var(--gray); cursor: pointer; }
+.modal-content details input { margin-top: 8px; width: 100%; }
+.modal-content details button { margin-top: 8px; }
+
+/* ── MESSAGES ── */
+.msg-ok { color: var(--green); font-size: 13px; font-weight: 600; margin-top: 8px; }
+.msg-err { color: var(--red); font-size: 13px; font-weight: 600; margin-top: 8px; }
+
+hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+.hidden { display: none !important; }
+
+/* ── FOOTER ── */
+body::after {
+  content: 'ACES Club Inc.  ·  Laurel, MD  ·  myacesclub.com';
+  display: block;
+  text-align: center;
+  font-size: 11px;
+  color: var(--gray);
+  padding: 20px;
+  letter-spacing: 1px;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+  .header-title { font-size: 20px; }
+  .tab { font-size: 12px; padding: 8px 10px; }
+  #leaderboard-table th, #leaderboard-table td { padding: 10px 8px; font-size: 12px; }
+  .form-row { flex-direction: column; }
+  label { min-width: unset; }
+}
