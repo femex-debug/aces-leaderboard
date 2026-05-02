@@ -43,15 +43,17 @@ function buildStats(matches, players) {
       const t1Names = m.matchType === "doubles" ? [m.team1a, m.team1b] : [m.player1];
       const t2Names = m.matchType === "doubles" ? [m.team2a, m.team2b] : [m.player2];
       m.sets.forEach(s => {
+        const a = s.p1 !== undefined ? s.p1 : s[0];
+        const b = s.p2 !== undefined ? s.p2 : s[1];
         t1Names.filter(Boolean).forEach(n => {
           if (!stats[n]) return;
-          stats[n].gamesWon += s[0]; stats[n].gamesLost += s[1];
-          if (s[0] > s[1]) stats[n].setsWon++; else if (s[1] > s[0]) stats[n].setsLost++;
+          stats[n].gamesWon += a; stats[n].gamesLost += b;
+          if (a > b) stats[n].setsWon++; else if (b > a) stats[n].setsLost++;
         });
         t2Names.filter(Boolean).forEach(n => {
           if (!stats[n]) return;
-          stats[n].gamesWon += s[1]; stats[n].gamesLost += s[0];
-          if (s[1] > s[0]) stats[n].setsWon++; else if (s[0] > s[1]) stats[n].setsLost++;
+          stats[n].gamesWon += b; stats[n].gamesLost += a;
+          if (b > a) stats[n].setsWon++; else if (a > b) stats[n].setsLost++;
         });
       });
     }

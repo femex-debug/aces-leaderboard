@@ -7,14 +7,17 @@ let allMatches = [];
 
 function determineWinner(sets) {
   let s1 = 0, s2 = 0;
-  sets.forEach(s => { if (s[0] > s[1]) s1++; else if (s[1] > s[0]) s2++; });
+  sets.forEach(s => { if (s.p1 > s.p2) s1++; else if (s.p2 > s.p1) s2++; });
   return s1 >= s2 ? 1 : 2;
 }
 
 function formatSets(sets) {
   return sets.map(s => {
-    let str = `${s[0]}-${s[1]}`;
-    if (s[2] !== undefined && s[2] !== null && s[2] !== "") str += `(${s[2]})`;
+    const a = s.p1 !== undefined ? s.p1 : s[0];
+    const b = s.p2 !== undefined ? s.p2 : s[1];
+    const tb = s.tb !== undefined ? s.tb : s[2];
+    let str = `${a}-${b}`;
+    if (tb !== undefined && tb !== null && tb !== "") str += `(${tb})`;
     return str;
   }).join(", ");
 }
@@ -100,7 +103,7 @@ function initMatchForm() {
       if (isNaN(a) || isNaN(b)) { msg.textContent = "Fill in all set scores."; msg.className = "msg-err"; return; }
       if (a === b) { msg.textContent = `Set ${i + 1}: scores can't be equal.`; msg.className = "msg-err"; return; }
       const tb = stb[i] ? parseInt(stb[i].value) : null;
-      sets.push(isNaN(tb) ? [a, b] : [a, b, tb]);
+      sets.push({ p1: a, p2: b, tb: isNaN(tb) ? null : tb });
     }
 
     matchData.sets = sets;
