@@ -140,19 +140,24 @@ function renderTourneyList() {
 }
 
 window._deleteTournament = async (id) => {
+  console.log("Delete requested for tournament ID:", id);
   const t = tournaments.find(x => x.id === id);
-  if (!t) return;
-  if (!confirm(`Delete tournament "${t.name}"? This cannot be undone.`)) return;
+  if (!t) { console.error("Tournament not found in local list:", id); return; }
+  if (!confirm(`Delete "${t.name}"? This cannot be undone.`)) return;
   try {
-    await deleteDoc(doc(db, "tournaments", id));
-    // Close bracket view if this tournament was open
+    console.log("Calling deleteDoc on tournaments/" + id);
+    const ref = doc(db, "tournaments", id);
+    await deleteDoc(ref);
+    console.log("Deleted successfully");
     if (activeTournamentId === id) {
       activeTournamentId = null;
-      document.getElementById("bracket-view").classList.add("hidden");
-      document.getElementById("bracket-view").innerHTML = "";
+      const view = document.getElementById("bracket-view");
+      view.classList.add("hidden");
+      view.innerHTML = "";
     }
   } catch (err) {
-    alert("Error deleting tournament: " + err.message);
+    console.error("Delete error:", err);
+    alert("Error deleting: " + err.message + "\nCheck Firebase rules — tournaments collection needs write: if true");
   }
 };
 

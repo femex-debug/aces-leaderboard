@@ -15,15 +15,7 @@ function buildStats(matches, players) {
     stats[p.name] = { division: p.division, wins: 0, losses: 0, setsWon: 0, setsLost: 0, gamesWon: 0, gamesLost: 0, streak: 0, streakType: "" };
   });
 
-  // Ensure all match participants exist in stats
-  matches.forEach(m => {
-    const names = m.matchType === "doubles"
-      ? [m.team1a, m.team1b, m.team2a, m.team2b]
-      : [m.player1, m.player2];
-    names.filter(Boolean).forEach(n => {
-      if (!stats[n]) stats[n] = { division: "men", wins: 0, losses: 0, setsWon: 0, setsLost: 0, gamesWon: 0, gamesLost: 0, streak: 0, streakType: "" };
-    });
-  });
+  // Only show players currently in the roster — removed players are excluded
 
   matches.forEach(m => {
     let winners, losers;
@@ -46,12 +38,12 @@ function buildStats(matches, players) {
         const a = s.p1 !== undefined ? s.p1 : s[0];
         const b = s.p2 !== undefined ? s.p2 : s[1];
         t1Names.filter(Boolean).forEach(n => {
-          if (!stats[n]) return;
+          if (!stats[n] || !players.find(p => p.name === n)) return;
           stats[n].gamesWon += a; stats[n].gamesLost += b;
           if (a > b) stats[n].setsWon++; else if (b > a) stats[n].setsLost++;
         });
         t2Names.filter(Boolean).forEach(n => {
-          if (!stats[n]) return;
+          if (!stats[n] || !players.find(p => p.name === n)) return;
           stats[n].gamesWon += b; stats[n].gamesLost += a;
           if (b > a) stats[n].setsWon++; else if (a > b) stats[n].setsLost++;
         });
@@ -71,12 +63,12 @@ function buildStats(matches, players) {
       losers = [m.winner === 1 ? m.player2 : m.player1];
     }
     winners.filter(Boolean).forEach(n => {
-      if (!stats[n]) return;
+      if (!stats[n] || !players.find(p => p.name === n)) return;
       stats[n].streak = stats[n].streakType === "W" ? stats[n].streak + 1 : 1;
       stats[n].streakType = "W";
     });
     losers.filter(Boolean).forEach(n => {
-      if (!stats[n]) return;
+      if (!stats[n] || !players.find(p => p.name === n)) return;
       stats[n].streak = stats[n].streakType === "L" ? stats[n].streak + 1 : 1;
       stats[n].streakType = "L";
     });
