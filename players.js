@@ -1,5 +1,6 @@
 // ── Players Module ──
 import { db, collection, doc, addDoc, deleteDoc, onSnapshot, query, orderBy } from "./firebase.js";
+import { getIsAdmin } from "./admin.js";
 
 let playersList = []; // [{ id, name, division }]
 let onPlayersChange = () => {};
@@ -40,8 +41,19 @@ function renderRoster() {
 }
 
 window._removePlayer = async (id) => {
-  if (confirm("Remove this player?")) await deleteDoc(doc(db, "players", id));
+  if (confirm("Remove this player from the roster?")) await deleteDoc(doc(db, "players", id));
 };
+
+window._removePlayerByName = async (name) => {
+  const player = playersList.find(p => p.name === name);
+  if (!player) return;
+  if (confirm(`Remove ${name} from the leaderboard? This will not delete their match history.`)) {
+    await deleteDoc(doc(db, "players", player.id));
+  }
+};
+
+// Expose admin check for leaderboard delete buttons
+window._getIsAdmin = () => getIsAdmin();
 
 export function updateDatalist() {
   const dl = document.getElementById("player-list");

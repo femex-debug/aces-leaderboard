@@ -106,6 +106,8 @@ export function renderLeaderboard() {
     const rc = rank <= 3 ? `rank-${rank}` : "";
     const trophy = rank === 1 ? " 🏆" : "";
     const badge = `<span class="division-badge badge-${p.division}">${p.division === "men" ? "M" : "W"}</span>`;
+    const isAdmin = window._getIsAdmin ? window._getIsAdmin() : false;
+    const delBtn = isAdmin ? `<button class="btn-sm" style="color:#C0392B;border-color:#C0392B;padding:3px 8px;font-size:11px" onclick="window._removePlayerByName('${p.name}')">✕</button>` : "";
     return `<tr class="${anim}">
       <td class="rank-cell ${rc}">${rank}</td>
       <td class="player-name">${p.name}${trophy} ${badge}</td>
@@ -113,6 +115,7 @@ export function renderLeaderboard() {
       <td>${p.setsWon}-${p.setsLost}</td>
       <td>${p.gamesWon}-${p.gamesLost}</td>
       <td>${streakHtml(p.streak, p.streakType)}</td>
+      <td>${delBtn}</td>
     </tr>`;
   }).join("");
 

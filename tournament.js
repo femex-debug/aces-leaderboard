@@ -1,8 +1,9 @@
 // ── Tournament Bracket Module ──
-import { db, collection, doc, addDoc, setDoc, onSnapshot, query, orderBy } from "./firebase.js";
+import { db, collection, doc, addDoc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "./firebase.js";
 import { getIsAdmin } from "./admin.js";
 
 let tournaments = [];
+let activeTournamentId = null;
 
 export function initTournament() {
   const ref = collection(db, "tournaments");
@@ -11,6 +12,8 @@ export function initTournament() {
   onSnapshot(q, snap => {
     tournaments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderTourneyList();
+    // Refresh bracket view if one is open
+    if (activeTournamentId) window._viewBracket(activeTournamentId);
   }, err => {
     console.error("Tournament listener error:", err);
   });
@@ -44,17 +47,22 @@ export function initTournament() {
     const seeds = Array.from(seedInputs).map(i => i.value.trim()).filter(Boolean);
     if (seeds.length < 2) { msg.textContent = "Click Generate Seed Slots and enter at least 2 player names."; msg.className = "msg-err"; return; }
 
-    // Build bracket and flatten to Firestore-safe flat object
-    // Firestore cannot store arrays of arrays — store matches as a flat map
+    // RANDOMIZE the draw using Fisher-Yates shuffle
+    const shuffled = [...seeds];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    // Build bracket from shuffled order
     const bracketSize = Math.pow(2, Math.ceil(Math.log2(Math.max(size, 2))));
-    const allSeeds = [...seeds];
+    const allSeeds = [...shuffled];
     while (allSeeds.length < bracketSize) allSeeds.push("BYE");
 
-    // matches stored as flat object: key = "r{round}_m{match}"
-    const matches = {};
     const numRounds = Math.log2(bracketSize);
+    const matches = {};
 
-    // Round 1 — seed players
+    // Round 1 — randomized players
     for (let m = 0; m < bracketSize / 2; m++) {
       const p1 = allSeeds[m * 2]     || "BYE";
       const p2 = allSeeds[m * 2 + 1] || "BYE";
@@ -62,7 +70,7 @@ export function initTournament() {
       matches[`r0_m${m}`] = { p1, p2, score: "", winner };
     }
 
-    // Remaining rounds — empty slots
+    // Remaining rounds — empty
     for (let r = 1; r < numRounds; r++) {
       const matchCount = Math.pow(2, numRounds - r - 1);
       for (let m = 0; m < matchCount; m++) {
@@ -70,7 +78,7 @@ export function initTournament() {
       }
     }
 
-    // Propagate BYE winners into round 2
+    // Propagate BYE winners forward
     for (let m = 0; m < bracketSize / 2; m++) {
       const match = matches[`r0_m${m}`];
       if (match.winner) {
@@ -82,25 +90,16 @@ export function initTournament() {
     }
 
     const payload = {
-      name,
-      division,
-      size,
-      bracketSize,
-      numRounds,
-      date,
-      seeds,
-      matches,         // flat object — Firestore safe
-      status: "active",
-      champion: "",
+      name, division, size, bracketSize, numRounds,
+      date, seeds: shuffled,
+      matches, status: "active", champion: "",
       createdAt: new Date().toISOString()
     };
 
-    console.log("Saving tournament:", payload);
-
     try {
       const docRef = await addDoc(collection(db, "tournaments"), payload);
-      console.log("Saved with ID:", docRef.id);
-      msg.textContent = "✅ Tournament created!";
+      console.log("Tournament saved:", docRef.id);
+      msg.textContent = "✅ Tournament created! Draw has been randomized.";
       msg.className = "msg-ok";
       e.target.reset();
       document.getElementById("tourney-seeds").innerHTML = "";
@@ -125,24 +124,55 @@ function getRoundName(roundIdx, numRounds) {
 function renderTourneyList() {
   const el = document.getElementById("tourney-list");
   if (!tournaments.length) { el.innerHTML = "<p>No tournaments yet.</p>"; return; }
+  const isAdmin = getIsAdmin();
   el.innerHTML = tournaments.map(t => {
     const status = t.status === "active" ? "🟢 In Progress" : "✅ Completed";
     const champ  = t.champion ? `<br>🏆 Champion: <b>${t.champion}</b>` : "";
+    const delBtn = isAdmin
+      ? `<button class="btn-sm" style="color:#C0392B;border-color:#C0392B;float:right;padding:4px 10px" onclick="event.stopPropagation();window._deleteTournament('${t.id}')">🗑 Delete</button>`
+      : "";
     return `<div class="tourney-card" onclick="window._viewBracket('${t.id}')">
+      ${delBtn}
       <h4>${t.name}</h4>
       <p>${(t.division||"").toUpperCase()} &bull; ${t.size} players &bull; ${t.date} &bull; ${status}${champ}</p>
     </div>`;
   }).join("");
 }
 
+window._deleteTournament = async (id) => {
+  const t = tournaments.find(x => x.id === id);
+  if (!t) return;
+  if (!confirm(`Delete tournament "${t.name}"? This cannot be undone.`)) return;
+  try {
+    await deleteDoc(doc(db, "tournaments", id));
+    // Close bracket view if this tournament was open
+    if (activeTournamentId === id) {
+      activeTournamentId = null;
+      document.getElementById("bracket-view").classList.add("hidden");
+      document.getElementById("bracket-view").innerHTML = "";
+    }
+  } catch (err) {
+    alert("Error deleting tournament: " + err.message);
+  }
+};
+
 window._viewBracket = (id) => {
   const t = tournaments.find(x => x.id === id);
   if (!t || !t.matches) return;
 
+  activeTournamentId = id;
   const view = document.getElementById("bracket-view");
   view.classList.remove("hidden");
+  const isAdmin = getIsAdmin();
 
-  let html = `<h3>${t.name} <small style="color:#757575">${t.date}</small></h3>`;
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <h3>${t.name} <small style="color:#757575">${t.date}</small></h3>
+    <div style="display:flex;gap:8px">
+      ${isAdmin ? `<button class="btn-sm" style="color:#C0392B;border-color:#C0392B" onclick="window._deleteTournament('${t.id}')">🗑 Delete Tournament</button>` : ""}
+      <button class="btn-sm" onclick="document.getElementById('bracket-view').classList.add('hidden');window._activeTournamentId=null">✕ Close</button>
+    </div>
+  </div>`;
+
   if (t.champion) html += `<div class="tourney-champion">🏆 Champion: ${t.champion}</div>`;
   html += `<div class="bracket">`;
 
@@ -160,7 +190,7 @@ window._viewBracket = (id) => {
       const p2Class   = match.winner && match.winner === match.p2 ? "winner" : (!match.p2 ? "empty" : "");
       const scoreStr  = match.score ? ` (${match.score})` : "";
       const isBye     = match.p1 === "BYE" || match.p2 === "BYE";
-      const canEnter  = getIsAdmin() && match.p1 && match.p2 && !match.winner && !isBye;
+      const canEnter  = isAdmin && match.p1 && match.p2 && !match.winner && !isBye;
       const enterBtn  = canEnter ? `<button class="btn-sm" onclick="window._enterBracketScore('${id}','${key}')">Score</button>` : "";
 
       html += `<div class="bracket-match ${completed}">
@@ -185,7 +215,6 @@ window._enterBracketScore = async (tourneyId, matchKey) => {
   const t = tournaments.find(x => x.id === tourneyId);
   if (!t) return;
 
-  // Parse round and match index from key e.g. "r0_m3"
   const parts    = matchKey.match(/r(\d+)_m(\d+)/);
   const roundIdx = parseInt(parts[1]);
   const matchIdx = parseInt(parts[2]);
@@ -194,7 +223,6 @@ window._enterBracketScore = async (tourneyId, matchKey) => {
   match.score  = score;
   match.winner = winnerNum === "1" ? match.p1 : match.p2;
 
-  // Build updated matches object
   const updatedMatches = { ...t.matches, [matchKey]: match };
 
   // Advance winner to next round
@@ -203,12 +231,11 @@ window._enterBracketScore = async (tourneyId, matchKey) => {
   const nextKey   = `r${nextRound}_m${nextMatch}`;
   if (updatedMatches[nextKey] !== undefined) {
     const nextM = { ...updatedMatches[nextKey] };
-    const slot  = matchIdx % 2 === 0 ? "p1" : "p2";
-    nextM[slot] = match.winner;
+    nextM[matchIdx % 2 === 0 ? "p1" : "p2"] = match.winner;
     updatedMatches[nextKey] = nextM;
   }
 
-  // Check if final match is decided
+  // Check for champion
   const finalKey   = `r${t.numRounds - 1}_m0`;
   const finalMatch = updatedMatches[finalKey];
   const isComplete = !!(finalMatch && finalMatch.winner);
@@ -216,9 +243,9 @@ window._enterBracketScore = async (tourneyId, matchKey) => {
 
   try {
     await setDoc(doc(db, "tournaments", tourneyId), {
-      matches:  updatedMatches,
-      status:   isComplete ? "completed" : "active",
-      champion: champion
+      matches: updatedMatches,
+      status:  isComplete ? "completed" : "active",
+      champion
     }, { merge: true });
   } catch (err) {
     console.error("Score update error:", err);
