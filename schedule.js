@@ -59,9 +59,12 @@ function renderScheduleList() {
       : `${s.player1} vs ${s.player2}`;
     const tag = s.matchType === "doubles" ? " 🏸" : "";
     const court = s.court ? ` • ${s.court}` : "";
+    const tournamentBadge = s.source === "tournament"
+      ? `<span style="background:#0F2D18;color:#C9A84C;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;margin-left:6px">${s.tournamentName || "Tournament"} • ${s.round || "Round 1"}</span>`
+      : "";
     const cancelBtn = getIsAdmin() ? `<button class="btn-sm" onclick="window._cancelMatch('${s.id}')">Cancel</button>` : "";
     return `<li>
-      <div><b>${players}</b>${tag}</div>
+      <div><b>${players}</b>${tag}${tournamentBadge}</div>
       <div class="match-meta">${dateStr} at ${timeStr}${court}</div>
       ${cancelBtn}
     </li>`;

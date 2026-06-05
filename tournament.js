@@ -1,5 +1,5 @@
 // ── Tournament Bracket Module ──
-import { db, collection, doc, addDoc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "./firebase.js";
+import { db, collection, doc, addDoc, setDoc, deleteDoc, getDocs, onSnapshot, query, orderBy, where } from "./firebase.js";
 import { getIsAdmin } from "./admin.js";
 
 let tournaments = [];
@@ -99,7 +99,32 @@ export function initTournament() {
     try {
       const docRef = await addDoc(collection(db, "tournaments"), payload);
       console.log("Tournament saved:", docRef.id);
-      msg.textContent = "✅ Tournament created! Draw has been randomized.";
+
+      // Write Round 1 matches to the scheduled collection
+      const r1Count = bracketSize / 2;
+      const scheduleWrites = [];
+      for (let m = 0; m < r1Count; m++) {
+        const match = payload.matches[`r0_m${m}`];
+        // Skip BYE matches
+        if (match.p1 === "BYE" || match.p2 === "BYE") continue;
+        scheduleWrites.push(addDoc(collection(db, "scheduled"), {
+          matchType: "singles",
+          division: division,
+          player1: match.p1,
+          player2: match.p2,
+          dateTime: `${date}T09:00`,
+          court: "Tournament Court",
+          status: "upcoming",
+          source: "tournament",
+          tournamentId: docRef.id,
+          tournamentName: name,
+          round: "Round 1"
+        }));
+      }
+      await Promise.all(scheduleWrites);
+      console.log(`Added ${scheduleWrites.length} matches to schedule`);
+
+      msg.textContent = `✅ Tournament created! ${scheduleWrites.length} Round 1 matches added to Schedule.`;
       msg.className = "msg-ok";
       e.target.reset();
       document.getElementById("tourney-seeds").innerHTML = "";
@@ -148,7 +173,15 @@ window._deleteTournament = async (id) => {
     console.log("Calling deleteDoc on tournaments/" + id);
     const ref = doc(db, "tournaments", id);
     await deleteDoc(ref);
-    console.log("Deleted successfully");
+
+    // Also delete all scheduled matches tied to this tournament
+    const schedRef = collection(db, "scheduled");
+    const q = query(schedRef, where("tournamentId", "==", id));
+    const snap = await getDocs(q);
+    const deletes = snap.docs.map(d => deleteDoc(doc(db, "scheduled", d.id)));
+    await Promise.all(deletes);
+    console.log(`Deleted tournament and ${deletes.length} scheduled matches`);
+
     if (activeTournamentId === id) {
       activeTournamentId = null;
       const view = document.getElementById("bracket-view");
