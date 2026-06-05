@@ -1,17 +1,25 @@
 // ── Schedule Module ──
-import { db, collection, addDoc, deleteDoc, doc, setDoc, onSnapshot, query, orderBy } from "./firebase.js";
+import { db, collection, addDoc, deleteDoc, doc, setDoc, onSnapshot } from "./firebase.js";
 import { getIsAdmin } from "./admin.js";
 
 let scheduled = [];
 
 export function initSchedule() {
   const ref = collection(db, "scheduled");
-  const q = query(ref, orderBy("dateTime", "asc"));
-
-  onSnapshot(q, snap => {
+  // No orderBy on the query — avoids Firestore index requirements
+  // Sort in JavaScript instead so any missing dateTime fields don't break the listener
+  onSnapshot(ref, snap => {
     scheduled = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Sort by dateTime in JS — handles missing fields gracefully
+    scheduled.sort((a, b) => {
+      const da = a.dateTime || "9999";
+      const db2 = b.dateTime || "9999";
+      return da.localeCompare(db2);
+    });
     renderScheduleList();
     renderPendingInScoreTab();
+  }, err => {
+    console.error("Schedule listener error:", err);
   });
 
   document.getElementById("schedule-form").addEventListener("submit", async e => {
