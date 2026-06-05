@@ -15,9 +15,8 @@ export function initTournament() {
 
   document.getElementById("tourney-gen-seeds").addEventListener("click", () => {
     const size = parseInt(document.getElementById("tourney-size").value);
-    if (!size || size < 2) { alert("Please enter the number of players first."); return; }
     const container = document.getElementById("tourney-seeds");
-    container.innerHTML = "<h3>Seed Players ("+size+" total)</h3>";
+    container.innerHTML = "<h3>Seed Players</h3>";
     for (let i = 1; i <= size; i++) {
       container.innerHTML += `<div class="form-row"><label>Seed ${i} <input type="text" class="seed-input" list="player-list" placeholder="Player name"></label></div>`;
     }
@@ -30,11 +29,10 @@ export function initTournament() {
     const division = document.getElementById("tourney-div").value;
     const size = parseInt(document.getElementById("tourney-size").value);
     const date = document.getElementById("tourney-date").value;
-    if (!size || size < 2) { msg.textContent = "Enter number of players first."; msg.className = "msg-err"; return; }
 
     const seedInputs = document.querySelectorAll(".seed-input");
     const seeds = Array.from(seedInputs).map(i => i.value.trim()).filter(Boolean);
-    if (seeds.length < 2) { msg.textContent = "Add at least 2 players using Generate Seed Slots."; msg.className = "msg-err"; return; }
+    if (seeds.length < 2) { msg.textContent = "Need at least 2 players."; msg.className = "msg-err"; return; }
 
     const rounds = buildBracket(seeds, size);
 
@@ -48,12 +46,10 @@ export function initTournament() {
 }
 
 function buildBracket(seeds, size) {
-  // Round size up to next power of 2 to handle 12, 24 etc
-  const bracketSize = Math.pow(2, Math.ceil(Math.log2(size)));
-  while (seeds.length < bracketSize) seeds.push("BYE");
+  while (seeds.length < size) seeds.push("BYE");
   const rounds = [];
   const r1 = [];
-  for (let i = 0; i < bracketSize; i += 2) {
+  for (let i = 0; i < size; i += 2) {
     const p1 = seeds[i], p2 = seeds[i + 1];
     const match = { p1, p2, score: null, winner: null };
     if (p2 === "BYE") match.winner = p1;
@@ -92,7 +88,6 @@ function getRoundNames(count) {
   if (count === 2) return ["Semifinal", "Final"];
   if (count === 3) return ["Quarterfinal", "Semifinal", "Final"];
   if (count === 4) return ["Round of 16", "Quarterfinal", "Semifinal", "Final"];
-  if (count === 5) return ["Round of 32", "Round of 16", "Quarterfinal", "Semifinal", "Final"];
   return Array.from({ length: count }, (_, i) => i === count - 1 ? "Final" : `Round ${i + 1}`);
 }
 
