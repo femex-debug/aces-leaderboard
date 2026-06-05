@@ -107,6 +107,7 @@ export function initTournament() {
         const match = payload.matches[`r0_m${m}`];
         // Skip BYE matches
         if (match.p1 === "BYE" || match.p2 === "BYE") continue;
+        const matchKey = `r0_m${m}`;
         scheduleWrites.push(addDoc(collection(db, "scheduled"), {
           matchType: "singles",
           division: division,
@@ -118,7 +119,8 @@ export function initTournament() {
           source: "tournament",
           tournamentId: docRef.id,
           tournamentName: name,
-          round: "Round 1"
+          round: "Round 1",
+          matchKey: matchKey
         }));
       }
       await Promise.all(scheduleWrites);
@@ -171,16 +173,18 @@ window._deleteTournament = async (id) => {
   if (!confirm(`Delete "${t.name}"? This cannot be undone.`)) return;
   try {
     console.log("Calling deleteDoc on tournaments/" + id);
-    const ref = doc(db, "tournaments", id);
-    await deleteDoc(ref);
 
-    // Also delete all scheduled matches tied to this tournament
+    // Delete tournament document
+    await deleteDoc(doc(db, "tournaments", id));
+
+    // Delete scheduled entries for this tournament only
+    // Match history in the matches collection is intentionally preserved on the leaderboard
     const schedRef = collection(db, "scheduled");
     const q = query(schedRef, where("tournamentId", "==", id));
     const snap = await getDocs(q);
     const deletes = snap.docs.map(d => deleteDoc(doc(db, "scheduled", d.id)));
     await Promise.all(deletes);
-    console.log(`Deleted tournament and ${deletes.length} scheduled matches`);
+    console.log(`Deleted tournament + ${deletes.length} scheduled entries. Match history preserved on leaderboard.`);
 
     if (activeTournamentId === id) {
       activeTournamentId = null;
@@ -190,7 +194,7 @@ window._deleteTournament = async (id) => {
     }
   } catch (err) {
     console.error("Delete error:", err);
-    alert("Error deleting: " + err.message + "\nCheck Firebase rules — tournaments collection needs write: if true");
+    alert("Error deleting: " + err.message + "\nCheck Firebase rules.");
   }
 };
 
@@ -265,12 +269,19 @@ window._enterBracketScore = async (tourneyId, matchKey) => {
 
   // Advance winner to next round
   const nextRound = roundIdx + 1;
-  const nextMatch = Math.floor(matchIdx / 2);
-  const nextKey   = `r${nextRound}_m${nextMatch}`;
+  const nextMatchIdx = Math.floor(matchIdx / 2);
+  const nextKey   = `r${nextRound}_m${nextMatchIdx}`;
+  let nextMatchReady = null;
+
   if (updatedMatches[nextKey] !== undefined) {
     const nextM = { ...updatedMatches[nextKey] };
     nextM[matchIdx % 2 === 0 ? "p1" : "p2"] = match.winner;
     updatedMatches[nextKey] = nextM;
+
+    // Check if both players are now set in the next round match
+    if (nextM.p1 && nextM.p2 && nextM.p1 !== "BYE" && nextM.p2 !== "BYE" && !nextM.winner) {
+      nextMatchReady = { key: nextKey, match: nextM, roundIdx: nextRound, matchIdx: nextMatchIdx };
+    }
   }
 
   // Check for champion
@@ -279,12 +290,82 @@ window._enterBracketScore = async (tourneyId, matchKey) => {
   const isComplete = !!(finalMatch && finalMatch.winner);
   const champion   = isComplete ? finalMatch.winner : (t.champion || "");
 
+  // Get round name for schedule label
+  const roundNames = ["Round 1","Round 2","Quarterfinal","Semifinal","Final"];
+  const getRoundLabel = (rIdx, numR) => {
+    const fromEnd = numR - 1 - rIdx;
+    if (fromEnd === 0) return "Final";
+    if (fromEnd === 1) return "Semifinal";
+    if (fromEnd === 2) return "Quarterfinal";
+    return `Round ${rIdx + 1}`;
+  };
+
   try {
+    // Save tournament state
     await setDoc(doc(db, "tournaments", tourneyId), {
       matches: updatedMatches,
       status:  isComplete ? "completed" : "active",
       champion
     }, { merge: true });
+
+    // Write match result to matches collection so it appears on leaderboard
+    const setScores = score.split(",").map(s => {
+      const parts = s.trim().split("-");
+      const p1s = parseInt(parts[0]) || 0;
+      const p2s = parseInt(parts[1]) || 0;
+      return { p1: p1s, p2: p2s, tb: null };
+    });
+    const matchWinner = winnerNum === "1" ? 1 : 2;
+    await addDoc(collection(db, "matches"), {
+      matchType: "singles",
+      division: t.division,
+      player1: match.p1,
+      player2: match.p2,
+      winner: matchWinner,
+      sets: setScores,
+      resultType: "completed",
+      source: "tournament",
+      tournamentId: tourneyId,
+      tournamentName: t.name,
+      round: getRoundLabel(roundIdx, t.numRounds),
+      date: new Date().toISOString()
+    });
+
+    // Remove the completed match from scheduled
+    const schedRef = collection(db, "scheduled");
+    const qDone = query(schedRef,
+      where("tournamentId", "==", tourneyId),
+      where("matchKey", "==", matchKey)
+    );
+    const snapDone = await getDocs(qDone);
+    await Promise.all(snapDone.docs.map(d => deleteDoc(doc(db, "scheduled", d.id))));
+
+    // Add next round match to scheduled if both players are ready
+    if (nextMatchReady) {
+      const roundLabel = getRoundLabel(nextMatchReady.roundIdx, t.numRounds);
+      await addDoc(collection(db, "scheduled"), {
+        matchType: "singles",
+        division: t.division,
+        player1: nextMatchReady.match.p1,
+        player2: nextMatchReady.match.p2,
+        dateTime: `${t.date}T09:00`,
+        court: "Tournament Court",
+        status: "upcoming",
+        source: "tournament",
+        tournamentId: tourneyId,
+        tournamentName: t.name,
+        round: roundLabel,
+        matchKey: nextMatchReady.key
+      });
+    }
+
+    if (isComplete) {
+      // Clean up any remaining scheduled matches for this tournament
+      const qAll = query(schedRef, where("tournamentId", "==", tourneyId));
+      const snapAll = await getDocs(qAll);
+      await Promise.all(snapAll.docs.map(d => deleteDoc(doc(db, "scheduled", d.id))));
+    }
+
   } catch (err) {
     console.error("Score update error:", err);
     alert("Error saving score: " + err.message);
