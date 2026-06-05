@@ -113,7 +113,7 @@ export function initTournament() {
           division: division,
           player1: match.p1,
           player2: match.p2,
-          dateTime: `${date}T09:00`,
+          dateTime: `${date}T09:00:00`,
           court: "Tournament Court",
           status: "upcoming",
           source: "tournament",
@@ -332,13 +332,12 @@ window._enterBracketScore = async (tourneyId, matchKey) => {
     });
 
     // Remove the completed match from scheduled
+    // Use single where clause (no composite index needed) then filter matchKey in JS
     const schedRef = collection(db, "scheduled");
-    const qDone = query(schedRef,
-      where("tournamentId", "==", tourneyId),
-      where("matchKey", "==", matchKey)
-    );
+    const qDone = query(schedRef, where("tournamentId", "==", tourneyId));
     const snapDone = await getDocs(qDone);
-    await Promise.all(snapDone.docs.map(d => deleteDoc(doc(db, "scheduled", d.id))));
+    const toDelete = snapDone.docs.filter(d => d.data().matchKey === matchKey);
+    await Promise.all(toDelete.map(d => deleteDoc(doc(db, "scheduled", d.id))));
 
     // Add next round match to scheduled if both players are ready
     if (nextMatchReady) {
@@ -348,7 +347,7 @@ window._enterBracketScore = async (tourneyId, matchKey) => {
         division: t.division,
         player1: nextMatchReady.match.p1,
         player2: nextMatchReady.match.p2,
-        dateTime: `${t.date}T09:00`,
+        dateTime: `${t.date}T09:00:00`,
         court: "Tournament Court",
         status: "upcoming",
         source: "tournament",

@@ -80,7 +80,11 @@ function renderPendingInScoreTab() {
   const upcoming = scheduled.filter(s => s.status === "upcoming");
   if (!upcoming.length) { el.innerHTML = "<p>No scheduled matches awaiting scores.</p>"; return; }
 
-  el.innerHTML = "<h3>Scheduled Matches — Enter Score</h3>" + upcoming.map(s => {
+  // Exclude tournament matches from the score entry tab — those are entered via the bracket
+  const nonTournament = upcoming.filter(s => s.source !== "tournament");
+  if (!nonTournament.length) { el.innerHTML = "<p>No scheduled matches awaiting scores.</p>"; return; }
+
+  el.innerHTML = "<h3>Scheduled Matches — Enter Score</h3>" + nonTournament.map(s => {
     const players = s.matchType === "doubles"
       ? `${s.team1a} & ${s.team1b} vs ${s.team2a} & ${s.team2b}`
       : `${s.player1} vs ${s.player2}`;
