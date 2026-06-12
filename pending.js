@@ -2,6 +2,7 @@
 // Handles: player score submissions, new player registrations (public)
 // Admin approval queue for both
 
+import { getCurrentSeason } from "./matches.js";
 import { db, collection, doc, addDoc, deleteDoc, setDoc, onSnapshot, getDocs, query, orderBy } from "./firebase.js";
 import { getIsAdmin } from "./admin.js";
 import { getPlayers } from "./players.js";
@@ -206,7 +207,8 @@ window._approveMatch = async (id) => {
       resultType: "completed",
       source: "player_submission",
       date: new Date().toISOString(),
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      season: getCurrentSeason()
     });
     await deleteDoc(doc(db, "pending_matches", id));
   } catch (err) {

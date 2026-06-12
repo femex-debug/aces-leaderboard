@@ -1,4 +1,5 @@
 // ── Tournament Bracket Module ──
+import { getCurrentSeason } from "./matches.js";
 import { db, collection, doc, addDoc, setDoc, deleteDoc, getDocs, onSnapshot, query, orderBy, where } from "./firebase.js";
 import { getIsAdmin } from "./admin.js";
 
@@ -328,7 +329,9 @@ window._enterBracketScore = async (tourneyId, matchKey) => {
       tournamentId: tourneyId,
       tournamentName: t.name,
       round: getRoundLabel(roundIdx, t.numRounds),
-      date: new Date().toISOString()
+      date: new Date().toISOString(),
+      timestamp: Date.now(),
+      season: getCurrentSeason()
     });
 
     // Remove the completed match from scheduled

@@ -1,7 +1,7 @@
 // ── Firebase Setup — ACES Club Inc. ──
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, deleteDoc,
+  getFirestore, collection, doc, addDoc, setDoc, updateDoc, getDoc, getDocs, deleteDoc,
   onSnapshot, query, orderBy, where, limit
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -18,4 +18,4 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-export { db, collection, doc, addDoc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, query, orderBy, where, limit };
+export { db, collection, doc, addDoc, setDoc, updateDoc, getDoc, getDocs, deleteDoc, onSnapshot, query, orderBy, where, limit };

@@ -1,9 +1,12 @@
 // ── Matches Module (score entry, recent, h2h) ──
-import { db, collection, addDoc, getDocs, onSnapshot, query, orderBy, doc, setDoc } from "./firebase.js";
+import { db, collection, addDoc, getDocs, getDoc, onSnapshot, query, orderBy, doc, setDoc } from "./firebase.js";
 import { renderLeaderboard, setMatches, computeMVP } from "./leaderboard.js";
 import { updateDatalist } from "./players.js";
 
 let allMatches = [];
+let currentSeason = "default";
+
+export function getCurrentSeason() { return currentSeason; }
 
 function determineWinner(sets) {
   let s1 = 0, s2 = 0;
@@ -26,12 +29,38 @@ export function initMatches() {
   const matchesRef = collection(db, "matches");
   const q = query(matchesRef, orderBy("timestamp", "asc"));
 
+  // Load current season from config, then start listener
+  getDoc(doc(db, "config", "season")).then(snap => {
+    currentSeason = snap.exists() ? (snap.data().current || "default") : "default";
+  }).catch(() => { currentSeason = "default"; });
+
+  // Update season label on page
+  function updateSeasonLabel(s) {
+    const el = document.getElementById("lb-season-label");
+    if (!el) return;
+    const num = s === "default" ? 1 : parseInt(s.replace("season_","")) || 1;
+    el.textContent = `Season ${num}`;
+  }
+
   onSnapshot(q, snap => {
     allMatches = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    setMatches(allMatches);
+    // Filter to current season only for leaderboard
+    const seasonMatches = allMatches.filter(m => (m.season || "default") === currentSeason);
+    setMatches(seasonMatches);
     renderLeaderboard();
     renderRecent();
     renderPending();
+    computeMVP();
+  });
+
+  // Also re-filter when season changes (after a reset)
+  onSnapshot(doc(db, "config", "season"), snap => {
+    currentSeason = snap.exists() ? (snap.data().current || "default") : "default";
+    updateSeasonLabel(currentSeason);
+    const seasonMatches = allMatches.filter(m => (m.season || "default") === currentSeason);
+    setMatches(seasonMatches);
+    renderLeaderboard();
+    renderRecent();
     computeMVP();
   });
 
@@ -111,6 +140,7 @@ function initMatchForm() {
     matchData.resultType = resultType;
     matchData.date = new Date().toISOString();
     matchData.timestamp = Date.now();
+    matchData.season = currentSeason;
 
     try {
       await addDoc(collection(db, "matches"), matchData);

@@ -49,4 +49,48 @@ export function initAdmin() {
   });
 
   document.getElementById("admin-logout").addEventListener("click", () => showAdminUI(false));
+
+  // Season management
+  initSeasonManagement();
+}
+
+async function initSeasonManagement() {
+  // Load and display current season
+  try {
+    const snap = await getDoc(doc(db, "config", "season"));
+    const seasonNum = snap.exists() ? (snap.data().number || 1) : 1;
+    const label = document.getElementById("current-season-label");
+    if (label) label.textContent = `Season ${seasonNum}`;
+  } catch(e) {}
+
+  const btn = document.getElementById("new-season-btn");
+  if (!btn) return;
+
+  btn.addEventListener("click", async () => {
+    const msg = document.getElementById("season-msg");
+    if (!confirm("Start a new season? The leaderboard will reset and show only new scores going forward. All previous data is safely preserved.")) return;
+
+    try {
+      // Get current season number
+      const snap = await getDoc(doc(db, "config", "season"));
+      const currentNum = snap.exists() ? (snap.data().number || 1) : 1;
+      const newNum = currentNum + 1;
+      const newSeasonId = `season_${newNum}`;
+
+      await setDoc(doc(db, "config", "season"), {
+        current: newSeasonId,
+        number: newNum,
+        startedAt: new Date().toISOString()
+      });
+
+      const label = document.getElementById("current-season-label");
+      if (label) label.textContent = `Season ${newNum}`;
+
+      msg.textContent = `✅ Season ${newNum} started. Leaderboard is now fresh.`;
+      msg.className = "msg-ok";
+    } catch(err) {
+      msg.textContent = "Error: " + err.message;
+      msg.className = "msg-err";
+    }
+  });
 }

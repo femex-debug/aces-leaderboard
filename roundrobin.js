@@ -1,4 +1,5 @@
 // ── Round Robin Tournament Module ──
+import { getCurrentSeason } from "./matches.js";
 import { db, collection, doc, addDoc, setDoc, deleteDoc, getDocs, onSnapshot, query, where } from "./firebase.js";
 import { getIsAdmin } from "./admin.js";
 import { getPlayers } from "./players.js";
@@ -180,7 +181,8 @@ window._rrEnterScore = async (rrId, group, p1, p2) => {
       rrId,
       rrGroup: group,
       date: new Date().toISOString(),
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      season: getCurrentSeason()
     });
 
   } catch (err) {
@@ -291,7 +293,8 @@ window._rrEnterKnockoutScore = async (rrId, stage, matchId, p1, p2) => {
       rrId,
       rrGroup: stage,
       date: new Date().toISOString(),
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      season: getCurrentSeason()
     });
   } catch (err) {
     alert("Error: " + err.message);

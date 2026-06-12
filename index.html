@@ -50,7 +50,7 @@
     <div class="panel-header">
       <div>
         <div class="panel-title">Standings</div>
-        <div class="panel-sub">Updated in real time</div>
+        <div class="panel-sub">Updated in real time &nbsp;·&nbsp; <span id="lb-season-label" style="color:var(--green);font-weight:600"></span></div>
       </div>
       <div class="skill-filter-tabs">
         <button class="skill-tab active" data-div="all">All</button>
@@ -437,6 +437,21 @@
     </div>
 
     <!-- Pending queue -->
+    <!-- Season Reset -->
+    <div class="admin-section" style="border-color:rgba(214,48,49,0.3)">
+      <div class="admin-section-header">
+        <span>🔄 Season Management</span>
+        <span id="current-season-label" class="badge-count" style="background:var(--green)">Season 1</span>
+      </div>
+      <div class="admin-section-sub">
+        Start a new season to reset the leaderboard. All previous scores are preserved in Firebase but won't show on the board. Players stay on the roster.
+      </div>
+      <button id="new-season-btn" class="btn-danger" style="padding:10px 20px;font-size:13px">
+        🔄 Start New Season
+      </button>
+      <p id="season-msg" class="form-msg"></p>
+    </div>
+
     <div class="admin-section">
       <div class="admin-section-header">
         <span>📬 Pending Approvals</span>
