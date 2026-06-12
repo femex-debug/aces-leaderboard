@@ -127,8 +127,8 @@ function renderPendingQueue() {
           <div style="font-size:12px;color:#666">Score: ${m.score} &bull; Submitted ${d}</div>
         </div>
         <div style="display:flex;gap:8px">
-          <button class="btn-sm" style="color:#27500a;border-color:#27500a" onclick="window._approveMatch('${m.id}')">✅ Approve</button>
-          <button class="btn-sm" style="color:#C0392B;border-color:#C0392B" onclick="window._rejectMatch('${m.id}')">✕ Reject</button>
+          <button class="btn-secondary btn-sm" onclick="window._approveMatch('${m.id}')">✅ Approve</button>
+          <button class="btn-danger btn-sm" onclick="window._rejectMatch('${m.id}')">✕ Reject</button>
         </div>
       </div>`;
     });

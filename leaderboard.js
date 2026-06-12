@@ -85,6 +85,10 @@ function streakHtml(count, type) {
 }
 
 export function renderLeaderboard() {
+  // Read active skill filter
+  const activeSkill = document.querySelector(".skill-tab.active");
+  const divFilter = activeSkill ? activeSkill.dataset.div : "all";
+
   const stats = buildStats(allMatches, getPlayers());
   let entries = Object.entries(stats).map(([name, s]) => ({ name, ...s, pct: winPct(s.wins, s.losses) }));
 
@@ -99,7 +103,7 @@ export function renderLeaderboard() {
     const trophy = rank === 1 ? " 🏆" : "";
     const badge = `<span class="division-badge badge-${p.division}">${p.division === "men" ? "M" : "W"}</span>`;
     const isAdmin = window._getIsAdmin ? window._getIsAdmin() : false;
-    const delBtn = isAdmin ? `<button class="btn-sm" style="color:#FF6B6B;border-color:rgba(231,76,60,0.4);padding:3px 8px;font-size:10px" onclick="window._removePlayerByName('${p.name}')">✕</button>` : "";
+    const delBtn = isAdmin ? `<button class="btn-danger btn-sm" onclick="window._removePlayerByName('${p.name}')">✕</button>` : "";
     const pctBar = `<div class="pct-bar"><div class="pct-track"><div class="pct-fill" style="width:${p.pct}%"></div></div><span class="pct-text">${p.pct}%</span></div>`;
     return `<tr class="${anim}">
       <td class="rank-cell ${rc}">${rank}</td>

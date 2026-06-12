@@ -311,175 +311,180 @@ function renderRRPage() {
 
   let html = "";
 
-  // Admin: create buttons
   if (isAdmin) {
-    html += `<div class="rr-admin-bar" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
-      <button class="btn-primary" onclick="window._rrCreate('beginner')">+ Create Beginner Round Robin</button>
-      <button class="btn-primary" onclick="window._rrCreate('experienced')">+ Create Experienced Round Robin</button>
+    html += `<div class="rr-admin-bar">
+      <button class="btn-primary" onclick="window._rrCreate('beginner')">+ Beginner Round Robin</button>
+      <button class="btn-primary" onclick="window._rrCreate('experienced')">+ Experienced Round Robin</button>
     </div>`;
   }
 
   const tournaments = Object.values(rrTournaments).sort((a,b) => (b.createdAt||"").localeCompare(a.createdAt||""));
 
   if (!tournaments.length) {
-    html += `<p style="color:#888;padding:20px 0">No round robin tournaments yet. Admin can create one above.</p>`;
+    document.getElementById("rr-empty") && document.getElementById("rr-empty").classList.remove("hidden");
+    container.innerHTML = html;
+    return;
   }
 
   tournaments.forEach(t => {
     const statusBadge = t.status === "completed"
-      ? `<span style="background:#eaf3de;color:#27500a;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600">COMPLETED</span>`
-      : `<span style="background:#e0f4ff;color:#0c447c;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600">ACTIVE</span>`;
+      ? `<span class="status-completed">Completed</span>`
+      : `<span class="status-active">Active</span>`;
 
-    html += `<div class="rr-card" style="background:white;border-radius:14px;border:0.5px solid #e0e0e0;margin-bottom:24px;overflow:hidden">`;
-    html += `<div style="background:#0F2D18;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">`;
-    html += `<div><span style="font-size:18px;font-weight:700;color:white;letter-spacing:1px">${t.division.toUpperCase()} ROUND ROBIN</span> ${statusBadge}</div>`;
-    html += `<div style="display:flex;gap:8px">`;
-    html += `<span style="font-size:12px;color:#C9A84C">Started ${t.startDate}</span>`;
-    if (isAdmin) html += `<button class="btn-sm" style="color:#E74C3C;border-color:#E74C3C" onclick="window._rrDelete('${t.id}')">🗑 Delete</button>`;
-    html += `</div></div>`;
+    html += `<div class="rr-card">`;
 
-    html += `<div style="padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:16px">`;
+    // Header
+    html += `<div class="rr-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="rr-header-title">${t.division.toUpperCase()} ROUND ROBIN</span>
+        ${statusBadge}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:rgba(255,255,255,0.5);font-family:Inter,sans-serif">Started ${t.startDate}</span>
+        ${isAdmin ? `<button class="btn-sm" style="background:rgba(214,48,49,0.15);border-color:rgba(214,48,49,0.3);color:#FF8080" onclick="window._rrDelete('${t.id}')">🗑 Delete</button>` : ""}
+      </div>
+    </div>`;
 
-    // Render Group A and B
-    ["A", "B"].forEach(grp => {
+    // Body
+    html += `<div class="rr-body">`;
+    html += `<div class="rr-groups">`;
+
+    ["A","B"].forEach(grp => {
       const group = t.groups?.[grp];
       const standing = t.standings?.[grp] || {};
       if (!group) return;
 
-      const sorted = [...group.players].sort((a, b) => {
-        const sa = standing[a] || { setWins:0, setLosses:0, matchWins:0 };
-        const sb = standing[b] || { setWins:0, setLosses:0, matchWins:0 };
+      const sorted = [...group.players].sort((a,b) => {
+        const sa = standing[a] || {setWins:0,setLosses:0,matchWins:0};
+        const sb = standing[b] || {setWins:0,setLosses:0,matchWins:0};
         if (sb.setWins !== sa.setWins) return sb.setWins - sa.setWins;
-        return (sb.setWins - sb.setLosses) - (sa.setWins - sa.setLosses);
+        return (sb.setWins-sb.setLosses) - (sa.setWins-sa.setLosses);
       });
 
       html += `<div>`;
-      html += `<div style="font-weight:700;font-size:14px;color:#0F2D18;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #C9A84C">GROUP ${grp}</div>`;
+      html += `<div class="rr-group-title">Group ${grp}</div>`;
 
       // Standings table
-      html += `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px">`;
-      html += `<tr style="background:#f5f5f5"><th style="text-align:left;padding:4px 6px">Player</th><th style="padding:4px 6px">SW</th><th style="padding:4px 6px">SL</th><th style="padding:4px 6px">MP</th></tr>`;
-      sorted.forEach((p, i) => {
-        const s = standing[p] || { setWins:0, setLosses:0, matchWins:0, played:0 };
-        const top2 = i < 2 && s.played > 0;
-        const bg = top2 ? "#eaf3de" : "white";
-        html += `<tr style="background:${bg}">
-          <td style="padding:4px 6px;font-weight:${top2?"700":"400"}">${i<2&&s.played>0?"🏆 ":""}${p}</td>
-          <td style="text-align:center;padding:4px 6px">${s.setWins}</td>
-          <td style="text-align:center;padding:4px 6px">${s.setLosses}</td>
-          <td style="text-align:center;padding:4px 6px">${s.matchWins}W</td>
+      html += `<table class="rr-table" style="margin-bottom:12px">`;
+      html += `<tr><th style="text-align:left">Player</th><th>SW</th><th>SL</th><th>W</th></tr>`;
+      sorted.forEach((p,i) => {
+        const s = standing[p] || {setWins:0,setLosses:0,matchWins:0,played:0};
+        const isTop = i < 2 && s.played > 0;
+        html += `<tr class="${isTop?"top-row":""}">
+          <td>${isTop?"🏆 ":""}${p}</td>
+          <td>${s.setWins}</td>
+          <td>${s.setLosses}</td>
+          <td>${s.matchWins}</td>
         </tr>`;
       });
       html += `</table>`;
-      html += `<div style="font-size:10px;color:#888;margin-bottom:8px">SW=Set Wins, SL=Set Losses, MP=Match Wins</div>`;
 
-      // Weekly assigned matchups
+      // Weekly matchups
       const weekly = group.weeklyMatchups || [];
       if (weekly.length) {
-        html += `<div style="font-size:12px;font-weight:600;color:#0F2D18;margin-bottom:6px">ASSIGNED MATCHUPS</div>`;
-        weekly.forEach((weekMatches, wi) => {
-          html += `<div style="margin-bottom:8px"><div style="font-size:11px;color:#888;margin-bottom:4px">Week ${wi+1}</div>`;
-          weekMatches.forEach(([mp1, mp2]) => {
-            const played = (t.matches||[]).some(m => !m.isSemiFinal && !m.isFinal && m.group === grp &&
-              ((m.p1===mp1&&m.p2===mp2)||(m.p1===mp2&&m.p2===mp1)));
-            html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:${played?"#eaf3de":"#f8f8f6"};border-radius:6px;margin-bottom:3px">`;
-            html += `<span style="font-size:12px">${played?"✅ ":""}${mp1} <b>vs</b> ${mp2}</span>`;
-            if (isAdmin && !played && t.status==="active") {
-              html += `<button class="btn-sm" onclick="window._rrEnterScore('${t.id}','${grp}','${mp1}','${mp2}')">Score</button>`;
-            }
-            html += `</div>`;
+        weekly.forEach((weekMatches,wi) => {
+          html += `<div class="rr-week-label">Week ${wi+1}</div>`;
+          weekMatches.forEach(([mp1,mp2]) => {
+            const played = (t.matches||[]).some(m =>
+              !m.isSemiFinal && !m.isFinal && m.group===grp &&
+              ((m.p1===mp1&&m.p2===mp2)||(m.p1===mp2&&m.p2===mp1))
+            );
+            html += `<div class="rr-matchup${played?" played":""}">
+              <span style="font-size:12px">${played?"✅ ":""}${mp1} <b>vs</b> ${mp2}</span>
+              ${isAdmin && !played && t.status==="active" ? `<button class="btn-secondary btn-xs" onclick="window._rrEnterScore('${t.id}','${grp}','${mp1}','${mp2}')">Score</button>` : ""}
+            </div>`;
           });
-          html += `</div>`;
         });
       }
 
-      // Open play matches logged so far
-      const openMatches = (t.matches||[]).filter(m => m.group === grp && !m.isSemiFinal && !m.isFinal);
-      if (openMatches.length) {
-        html += `<div style="font-size:12px;font-weight:600;color:#0F2D18;margin:10px 0 6px">MATCH HISTORY</div>`;
-        openMatches.slice().reverse().forEach(m => {
+      // Match history
+      const history = (t.matches||[]).filter(m => m.group===grp && !m.isSemiFinal && !m.isFinal);
+      if (history.length) {
+        html += `<div class="rr-week-label" style="margin-top:10px">Match History</div>`;
+        history.slice().reverse().forEach(m => {
           const d = m.date ? new Date(m.date).toLocaleDateString() : "";
-          html += `<div style="font-size:11px;color:#444;padding:3px 0">${m.winner} def. ${m.p1===m.winner?m.p2:m.p1} (${m.p1Sets}-${m.p2Sets}) <span style="color:#aaa">${d}</span></div>`;
+          html += `<div style="font-size:11px;color:var(--text-2);padding:3px 0;font-family:Inter,sans-serif">
+            <span style="color:var(--green);font-weight:600">${m.winner}</span> def. ${m.p1===m.winner?m.p2:m.p1}
+            <span style="background:var(--gold-pale);border-radius:10px;padding:1px 7px;font-size:10px;color:#7A5C00;margin:0 4px">${m.p1Sets}-${m.p2Sets}</span>
+            <span style="color:var(--muted)">${d}</span>
+          </div>`;
         });
       }
 
-      // Admin: log any group match
+      // Admin: log open match
       if (isAdmin && t.status==="active") {
-        html += `<div style="margin-top:10px"><select id="rr-${t.id}-${grp}-p1" style="width:45%;font-size:11px;padding:4px">
-          <option value="">Player 1</option>
-          ${group.players.map(p=>`<option value="${p}">${p}</option>`).join("")}
-        </select> <span>vs</span>
-        <select id="rr-${t.id}-${grp}-p2" style="width:45%;font-size:11px;padding:4px">
-          <option value="">Player 2</option>
-          ${group.players.map(p=>`<option value="${p}">${p}</option>`).join("")}
-        </select>
-        <button class="btn-sm" style="margin-top:4px;width:100%" onclick="
-          var p1=document.getElementById('rr-${t.id}-${grp}-p1').value;
-          var p2=document.getElementById('rr-${t.id}-${grp}-p2').value;
-          if(!p1||!p2||p1===p2){alert('Pick two different players');return;}
-          window._rrEnterScore('${t.id}','${grp}',p1,p2)
-        ">Log Open Match</button></div>`;
+        html += `<div style="margin-top:10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <select id="rr-${t.id}-${grp}-p1" style="flex:1;min-width:100px;font-size:11px;padding:5px 8px">
+            <option value="">Player 1</option>
+            ${group.players.map(p=>`<option value="${p}">${p}</option>`).join("")}
+          </select>
+          <span style="font-size:11px;color:var(--muted)">vs</span>
+          <select id="rr-${t.id}-${grp}-p2" style="flex:1;min-width:100px;font-size:11px;padding:5px 8px">
+            <option value="">Player 2</option>
+            ${group.players.map(p=>`<option value="${p}">${p}</option>`).join("")}
+          </select>
+          <button class="btn-secondary btn-xs" onclick="
+            var p1=document.getElementById('rr-${t.id}-${grp}-p1').value;
+            var p2=document.getElementById('rr-${t.id}-${grp}-p2').value;
+            if(!p1||!p2||p1===p2){alert('Pick two different players');return;}
+            window._rrEnterScore('${t.id}','${grp}',p1,p2)
+          ">Log Match</button>
+        </div>`;
       }
 
       html += `</div>`;
     });
 
-    html += `</div>`;
+    html += `</div>`; // rr-groups
 
     // Knockout stage
-    const semis = t.semifinals;
-    const final = t.final;
     const topA = getTopTwo(t.standings?.A || {});
     const topB = getTopTwo(t.standings?.B || {});
-    const showKnockout = topA.length >= 2 && topB.length >= 2;
+    if (topA.length >= 2 && topB.length >= 2) {
+      const semis = t.semifinals;
+      const fin = t.final;
+      const s1p1 = topA[0]||"TBD", s1p2 = topB[1]||"TBD";
+      const s2p1 = topB[0]||"TBD", s2p2 = topA[1]||"TBD";
+      const s1 = semis?.semi1, s2 = semis?.semi2;
 
-    if (showKnockout) {
-      html += `<div style="border-top:1px solid #eee;padding:16px 20px">`;
-      html += `<div style="font-weight:700;font-size:14px;color:#0F2D18;margin-bottom:12px">KNOCKOUT STAGE</div>`;
+      html += `</div><div class="rr-knockout">`;
+      html += `<div class="rr-knockout-title">🏆 Knockout Stage</div>`;
+      html += `<div class="semi-grid">`;
 
-      // Semis
-      const semi1p1 = topA[0] || "TBD", semi1p2 = topB[1] || "TBD";
-      const semi2p1 = topB[0] || "TBD", semi2p2 = topA[1] || "TBD";
-      const s1 = semis?.semi1; const s2 = semis?.semi2;
-      const fin = final;
-
-      html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">`;
       // Semi 1
-      html += `<div style="background:#f8f8f6;border-radius:8px;padding:12px">`;
-      html += `<div style="font-size:11px;color:#888;margin-bottom:6px">SEMIFINAL 1 — A1 vs B2</div>`;
-      html += `<div style="font-weight:600">${semi1p1} vs ${semi1p2}</div>`;
-      if (s1?.winner) html += `<div style="color:#27500a;font-size:12px;margin-top:4px">✅ ${s1.winner} advances (${s1.p1===s1.winner?s1.p1Sets:s1.p2Sets}-${s1.p1===s1.winner?s1.p2Sets:s1.p1Sets})</div>`;
-      else if (isAdmin && t.status==="active") html += `<button class="btn-sm" style="margin-top:8px" onclick="window._rrEnterKnockoutScore('${t.id}','semifinal','semi1','${semi1p1}','${semi1p2}')">Enter Score</button>`;
-      html += `</div>`;
+      html += `<div class="semi-card">
+        <div class="semi-label">Semifinal 1 — A1 vs B2</div>
+        <div class="semi-matchup">${s1p1} vs ${s1p2}</div>
+        ${s1?.winner ? `<div class="semi-result">✅ ${s1.winner} advances</div>` : (isAdmin && t.status==="active" ? `<button class="btn-secondary btn-xs" style="margin-top:8px" onclick="window._rrEnterKnockoutScore('${t.id}','semifinal','semi1','${s1p1}','${s1p2}')">Enter Score</button>` : "")}
+      </div>`;
 
       // Semi 2
-      html += `<div style="background:#f8f8f6;border-radius:8px;padding:12px">`;
-      html += `<div style="font-size:11px;color:#888;margin-bottom:6px">SEMIFINAL 2 — B1 vs A2</div>`;
-      html += `<div style="font-weight:600">${semi2p1} vs ${semi2p2}</div>`;
-      if (s2?.winner) html += `<div style="color:#27500a;font-size:12px;margin-top:4px">✅ ${s2.winner} advances (${s2.p1===s2.winner?s2.p1Sets:s2.p2Sets}-${s2.p1===s2.winner?s2.p2Sets:s2.p1Sets})</div>`;
-      else if (isAdmin && t.status==="active") html += `<button class="btn-sm" style="margin-top:8px" onclick="window._rrEnterKnockoutScore('${t.id}','semifinal','semi2','${semi2p1}','${semi2p2}')">Enter Score</button>`;
-      html += `</div>`;
+      html += `<div class="semi-card">
+        <div class="semi-label">Semifinal 2 — B1 vs A2</div>
+        <div class="semi-matchup">${s2p1} vs ${s2p2}</div>
+        ${s2?.winner ? `<div class="semi-result">✅ ${s2.winner} advances</div>` : (isAdmin && t.status==="active" ? `<button class="btn-secondary btn-xs" style="margin-top:8px" onclick="window._rrEnterKnockoutScore('${t.id}','semifinal','semi2','${s2p1}','${s2p2}')">Enter Score</button>` : "")}
+      </div>`;
       html += `</div>`;
 
       // Final
       if (s1?.winner && s2?.winner) {
-        const fp1 = fin?.p1 || s1.winner, fp2 = fin?.p2 || s2.winner;
-        html += `<div style="background:#0F2D18;border-radius:8px;padding:14px;text-align:center">`;
-        html += `<div style="font-size:11px;color:#C9A84C;margin-bottom:6px;letter-spacing:2px">FINAL</div>`;
+        const fp1 = fin?.p1||s1.winner, fp2 = fin?.p2||s2.winner;
+        html += `<div class="final-card">`;
+        html += `<div class="final-label">Final</div>`;
         if (t.champion) {
-          html += `<div style="font-size:20px;font-weight:700;color:#C9A84C">🏆 ${t.champion}</div>`;
-          html += `<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px">${t.division.toUpperCase()} CHAMPION</div>`;
+          html += `<div class="final-champion">${t.champion}</div>`;
+          html += `<div class="final-champ-label">${t.division} Champion</div>`;
         } else {
-          html += `<div style="font-weight:600;color:white">${fp1} vs ${fp2}</div>`;
-          if (isAdmin) html += `<button class="btn-sm" style="margin-top:10px;background:#C9A84C;color:#0F2D18;border-color:#C9A84C" onclick="window._rrEnterKnockoutScore('${t.id}','final','final','${fp1}','${fp2}')">Enter Final Score</button>`;
+          html += `<div class="final-matchup">${fp1} vs ${fp2}</div>`;
+          if (isAdmin) html += `<button class="btn-sm" style="background:rgba(201,168,76,0.2);border-color:rgba(201,168,76,0.4);color:var(--gold);margin-top:10px" onclick="window._rrEnterKnockoutScore('${t.id}','final','final','${fp1}','${fp2}')">Enter Final Score</button>`;
         }
         html += `</div>`;
       }
-
-      html += `</div>`;
+    } else {
+      html += `</div>`; // close rr-body
     }
 
-    html += `</div>`;
+    html += `</div>`; // rr-card
   });
 
   container.innerHTML = html;

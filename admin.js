@@ -8,6 +8,8 @@ export function getIsAdmin() { return isAdmin; }
 function showAdminUI(show) {
   isAdmin = show;
   document.getElementById("admin-bar").classList.toggle("hidden", !show);
+  // Show admin-only tabs and elements
+  document.querySelectorAll(".admin-only").forEach(el => el.classList.toggle("hidden", !show));
   document.getElementById("admin-toggle").textContent = show ? "🔓" : "🔒";
   document.querySelectorAll(".admin-only").forEach(el => el.classList.toggle("hidden", !show));
 }

@@ -8,19 +8,25 @@ import { initTournament } from "./tournament.js";
 import { initRoundRobin } from "./roundrobin.js";
 import { initPending, updatePublicDropdowns } from "./pending.js";
 
-// Tabs
+// Main tabs
 document.querySelectorAll(".tab").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
     document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
     btn.classList.add("active");
-    document.getElementById(btn.dataset.tab).classList.add("active");
-    // Re-render skill assignment when admin tab is opened
+    const panel = document.getElementById(btn.dataset.tab);
+    if (panel) { panel.classList.add("active"); panel.style.display = "block"; }
     if (btn.dataset.tab === "admin-panel") renderSkillAssignment();
-    // Re-render pending queue when submit tab opened
-    if (btn.dataset.tab === "submit-panel") {
-      document.getElementById("pub-p1") && updatePubDropdowns();
-    }
+  });
+});
+
+// Skill-level filter tabs on leaderboard
+document.querySelectorAll(".skill-tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".skill-tab").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    // renderLeaderboard reads the active skill-tab to filter
+    renderLeaderboard();
   });
 });
 
