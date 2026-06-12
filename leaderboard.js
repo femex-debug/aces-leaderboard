@@ -99,13 +99,16 @@ export function renderLeaderboard() {
     const trophy = rank === 1 ? " 🏆" : "";
     const badge = `<span class="division-badge badge-${p.division}">${p.division === "men" ? "M" : "W"}</span>`;
     const isAdmin = window._getIsAdmin ? window._getIsAdmin() : false;
-    const delBtn = isAdmin ? `<button class="btn-sm" style="color:#C0392B;border-color:#C0392B;padding:3px 8px;font-size:11px" onclick="window._removePlayerByName('${p.name}')">✕</button>` : "";
+    const delBtn = isAdmin ? `<button class="btn-sm" style="color:#FF6B6B;border-color:rgba(231,76,60,0.4);padding:3px 8px;font-size:10px" onclick="window._removePlayerByName('${p.name}')">✕</button>` : "";
+    const pctBar = `<div class="pct-bar"><div class="pct-track"><div class="pct-fill" style="width:${p.pct}%"></div></div><span class="pct-text">${p.pct}%</span></div>`;
     return `<tr class="${anim}">
       <td class="rank-cell ${rc}">${rank}</td>
-      <td class="player-name">${p.name}${trophy} ${badge}</td>
-      <td>${p.wins}</td><td>${p.losses}</td><td>${p.pct}%</td>
-      <td>${p.setsWon}-${p.setsLost}</td>
-      <td>${p.gamesWon}-${p.gamesLost}</td>
+      <td><div class="player-name">${p.name}${trophy} ${badge}</div></td>
+      <td style="font-weight:600;color:#5CE88A">${p.wins}</td>
+      <td style="color:rgba(255,255,255,0.4)">${p.losses}</td>
+      <td>${pctBar}</td>
+      <td style="font-size:12px;color:rgba(255,255,255,0.6)">${p.setsWon}-${p.setsLost}</td>
+      <td style="font-size:12px;color:rgba(255,255,255,0.6)">${p.gamesWon}-${p.gamesLost}</td>
       <td>${streakHtml(p.streak, p.streakType)}</td>
       <td>${delBtn}</td>
     </tr>`;

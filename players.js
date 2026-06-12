@@ -1,5 +1,5 @@
 // ── Players Module ──
-import { db, collection, doc, addDoc, deleteDoc, getDocs, onSnapshot, query, orderBy, where } from "./firebase.js";
+import { db, collection, doc, addDoc, setDoc, deleteDoc, getDocs, onSnapshot, query, orderBy, where } from "./firebase.js";
 import { getIsAdmin } from "./admin.js";
 
 let playersList = []; // [{ id, name, division }]
@@ -90,25 +90,46 @@ export function renderSkillAssignment() {
     return;
   }
 
-  el.innerHTML = playersList.map(p => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:white;border:0.5px solid #e0e0e0;border-radius:8px;margin-bottom:6px">
-      <span style="font-weight:600;font-size:13px">${p.name}</span>
-      <div style="display:flex;align-items:center;gap:8px">
-        <select onchange="window._setSkillLevel('${p.id}', this.value)" style="padding:5px 8px;border-radius:6px;border:0.5px solid #ccc;font-size:12px">
-          <option value="beginner" ${(p.division||"").toLowerCase()==="beginner"?"selected":""}>Beginner</option>
-          <option value="intermediate" ${(p.division||"").toLowerCase()==="intermediate"?"selected":""}>Intermediate</option>
-          <option value="experienced" ${(p.division||"").toLowerCase()==="experienced"?"selected":""}>Experienced</option>
-        </select>
-        <span class="division-badge badge-${p.division||'beginner'}" style="font-size:10px">${(p.division||"").toUpperCase()}</span>
-      </div>
-    </div>
-  `).join("");
+  // Sort: unassigned players first so admin can see who needs a level set
+  const sorted = [...playersList].sort((a, b) => {
+    const aSet = a.division ? 1 : 0;
+    const bSet = b.division ? 1 : 0;
+    return aSet - bSet || a.name.localeCompare(b.name);
+  });
+
+  const unassigned = sorted.filter(p => !p.division);
+  const assigned = sorted.filter(p => p.division);
+
+  let html = "";
+
+  if (unassigned.length) {
+    html += `<div style="background:#fff3cd;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#856404">
+      ⚠️ ${unassigned.length} player${unassigned.length>1?"s":""} without a skill level assigned
+    </div>`;
+  }
+
+  html += sorted.map(p => {
+    const div = (p.division || "").toLowerCase();
+    const isUnset = !p.division;
+    const bg = isUnset ? "#fff8e1" : "white";
+    const border = isUnset ? "1px solid #f0c040" : "0.5px solid #e0e0e0";
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${bg};border:${border};border-radius:8px;margin-bottom:6px">
+      <span style="font-weight:600;font-size:13px">${p.name}${isUnset?' <span style="font-size:10px;color:#856404;background:#fff3cd;padding:1px 6px;border-radius:10px">UNSET</span>':''}</span>
+      <select onchange="window._setSkillLevel('${p.id}', this.value)" style="padding:5px 10px;border-radius:6px;border:0.5px solid #ccc;font-size:13px">
+        <option value="" ${!div?"selected":""} disabled>Select level...</option>
+        <option value="beginner" ${div==="beginner"?"selected":""}>Beginner</option>
+        <option value="experienced" ${div==="experienced"?"selected":""}>Experienced</option>
+      </select>
+    </div>`;
+  }).join("");
+
+  el.innerHTML = html;
 }
 
 window._setSkillLevel = async (playerId, level) => {
+  if (!level) return;
   try {
-    const { db: _db, doc: _doc, setDoc: _setDoc } = await import("./firebase.js");
-    await _setDoc(_doc(_db, "players", playerId), { division: level }, { merge: true });
+    await setDoc(doc(db, "players", playerId), { division: level }, { merge: true });
   } catch (err) {
     alert("Error updating skill level: " + err.message);
   }

@@ -22,7 +22,7 @@ function assignGroups(players, division) {
   const filtered = players.filter(p => {
     const d = (p.division || p.skillLevel || "").toLowerCase();
     if (division === "beginner") return d === "beginner";
-    return d === "experienced" || d === "intermediate";
+    return d === "experienced";
   });
   // Shuffle
   for (let i = filtered.length - 1; i > 0; i--) {
