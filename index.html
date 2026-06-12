@@ -27,12 +27,15 @@
       </div>
       <div id="mvp-banner" class="mvp-banner hidden"></div>
       <nav id="main-nav">
-        <button class="tab active" data-tab="leaderboard">Leaderboard</button>
-        <button class="tab" data-tab="schedule">Schedule</button>
-        <button class="tab" data-tab="recent">Recent</button>
-        <button class="tab" data-tab="h2h">H2H</button>
-        <button class="tab" data-tab="tournament">Brackets</button>
-        <button class="tab admin-only hidden" data-tab="players">Players</button>
+        <button class="tab active" data-tab="leaderboard">🏆 Leaderboard</button>
+        <button class="tab" data-tab="schedule">📅 Schedule</button>
+        <button class="tab" data-tab="recent">📋 Recent</button>
+        <button class="tab" data-tab="h2h">🔍 H2H</button>
+        <button class="tab" data-tab="tournament">🎾 Brackets</button>
+        <button class="tab" data-tab="roundrobin">🔄 Round Robin</button>
+        <button class="tab" data-tab="submit-panel">📬 Submit Score</button>
+        <button class="tab admin-only hidden" data-tab="players">👥 Players</button>
+        <button class="tab admin-only hidden" data-tab="admin-panel">⚙️ Admin</button>
         <button class="tab admin-only hidden" data-tab="enter-score">Enter Score</button>
       </nav>
     </header>
@@ -270,5 +273,80 @@
     }
   </script>
   <script type="module" src="app.js"></script>
+
+  <!-- SUBMIT SCORE / JOIN (public) -->
+  <div id="submit-panel" class="panel">
+    <h2>Submit Your Score</h2>
+    <p style="color:#666;font-size:13px;margin-bottom:16px">Select both players and enter the score. An admin will review and approve.</p>
+    <form id="public-match-form" style="max-width:460px">
+      <div class="form-row">
+        <label>Your Name
+          <select id="pub-p1" required style="width:100%;padding:8px;border-radius:8px;border:0.5px solid #ccc;font-size:14px">
+            <option value="">Select player...</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-row">
+        <label>Opponent
+          <select id="pub-p2" required style="width:100%;padding:8px;border-radius:8px;border:0.5px solid #ccc;font-size:14px">
+            <option value="">Select player...</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-row" style="margin-top:10px">
+        <label>Score (e.g. 6-3 or 6-3, 7-5)
+          <input type="text" id="pub-score" placeholder="6-3, 7-5" required style="padding:9px 12px;border-radius:8px;border:0.5px solid #ccc;font-size:14px;width:100%">
+        </label>
+      </div>
+      <button type="submit" class="btn-primary" style="margin-top:12px">Submit for Approval</button>
+      <p id="public-match-msg" style="margin-top:10px;font-size:13px"></p>
+    </form>
+
+    <hr style="margin:32px 0;border-color:#eee">
+    <h2>New to ACES? Register Here</h2>
+    <p style="color:#666;font-size:13px;margin-bottom:16px">Enter your nickname and skill level. Admin will approve and add you to the leaderboard.</p>
+    <form id="public-player-form" style="max-width:460px">
+      <div class="form-row">
+        <label>Nickname
+          <input type="text" id="pub-nickname" placeholder="Your name or nickname" required style="padding:9px 12px;border-radius:8px;border:0.5px solid #ccc;font-size:14px;width:100%">
+        </label>
+      </div>
+      <div class="form-row" style="margin-top:10px">
+        <label>Skill Level
+          <select id="pub-skill" required style="width:100%;padding:8px;border-radius:8px;border:0.5px solid #ccc;font-size:14px">
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="experienced">Experienced</option>
+          </select>
+        </label>
+      </div>
+      <button type="submit" class="btn-primary" style="margin-top:12px">Submit Registration</button>
+      <p id="public-player-msg" style="margin-top:10px;font-size:13px"></p>
+    </form>
+  </div>
+
+  <!-- ROUND ROBIN -->
+  <div id="roundrobin" class="panel">
+    <h2>Round Robin Tournament</h2>
+    <p style="color:#666;font-size:13px;margin-bottom:16px">Month-long tournament starting June 15. Players are auto-assigned to groups by skill level. Top 2 from each group advance to semis and final. All match scores write to the main leaderboard.</p>
+    <div id="rr-container"></div>
+  </div>
+
+  <!-- ADMIN PANEL -->
+  <div id="admin-panel" class="panel admin-only hidden">
+    <h2>Admin Panel</h2>
+
+    <div style="background:white;border-radius:14px;border:0.5px solid #e0e0e0;padding:20px;margin-bottom:24px">
+      <h3 style="font-size:15px;color:#0F2D18;margin-bottom:16px">Pending Approvals</h3>
+      <div id="pending-queue"><p style="color:#888;font-size:13px">No pending submissions.</p></div>
+    </div>
+
+    <div style="background:white;border-radius:14px;border:0.5px solid #e0e0e0;padding:20px">
+      <h3 style="font-size:15px;color:#0F2D18;margin-bottom:6px">Assign Skill Levels</h3>
+      <p style="color:#666;font-size:13px;margin-bottom:16px">Set each player's skill level. This determines their round robin group assignment.</p>
+      <div id="skill-assignment"></div>
+    </div>
+  </div>
+
 </body>
 </html>

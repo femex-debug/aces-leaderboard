@@ -437,3 +437,22 @@ body::after {
   .form-row { flex-direction: column; }
   label { min-width: unset; }
 }
+
+/* ── Round Robin ── */
+.rr-card { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+.rr-admin-bar .btn-primary { padding: 8px 18px; font-size: 13px; }
+#rr-container table th, #rr-container table td { text-align: center; }
+#rr-container table td:first-child { text-align: left; }
+
+/* ── Submit tab ── */
+#submit-panel .form-row { margin-bottom: 14px; }
+#submit-panel label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 500; color: #444; }
+#submit-panel input, #submit-panel select { padding: 9px 12px; border-radius: 8px; border: 0.5px solid #ccc; font-size: 14px; font-family: inherit; }
+
+/* ── Admin panel ── */
+#admin-panel .card { background: white; border-radius: 14px; border: 0.5px solid #e0e0e0; padding: 20px; }
+#admin-panel h3 { font-size: 15px; color: #0F2D18; }
+#skill-assignment .division-badge { padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+
+/* ── Pending cards ── */
+.pending-card { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f8f8f6; border-radius: 10px; border: 0.5px solid #e0e0e0; flex-wrap: wrap; gap: 10px; }

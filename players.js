@@ -78,3 +78,38 @@ export function updateDatalist() {
   const dl = document.getElementById("player-list");
   dl.innerHTML = playersList.map(p => `<option value="${p.name}">`).join("");
 }
+
+// ── Skill Level Assignment (admin only) ──
+export function renderSkillAssignment() {
+  const el = document.getElementById("skill-assignment");
+  if (!el) return;
+  if (!getIsAdmin()) { el.innerHTML = ""; return; }
+
+  if (!playersList.length) {
+    el.innerHTML = `<p style="color:#888;font-size:13px">No players yet.</p>`;
+    return;
+  }
+
+  el.innerHTML = playersList.map(p => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:white;border:0.5px solid #e0e0e0;border-radius:8px;margin-bottom:6px">
+      <span style="font-weight:600;font-size:13px">${p.name}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <select onchange="window._setSkillLevel('${p.id}', this.value)" style="padding:5px 8px;border-radius:6px;border:0.5px solid #ccc;font-size:12px">
+          <option value="beginner" ${(p.division||"").toLowerCase()==="beginner"?"selected":""}>Beginner</option>
+          <option value="intermediate" ${(p.division||"").toLowerCase()==="intermediate"?"selected":""}>Intermediate</option>
+          <option value="experienced" ${(p.division||"").toLowerCase()==="experienced"?"selected":""}>Experienced</option>
+        </select>
+        <span class="division-badge badge-${p.division||'beginner'}" style="font-size:10px">${(p.division||"").toUpperCase()}</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+window._setSkillLevel = async (playerId, level) => {
+  try {
+    const { db: _db, doc: _doc, setDoc: _setDoc } = await import("./firebase.js");
+    await _setDoc(_doc(_db, "players", playerId), { division: level }, { merge: true });
+  } catch (err) {
+    alert("Error updating skill level: " + err.message);
+  }
+};
