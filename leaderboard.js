@@ -1,7 +1,7 @@
 // ── Leaderboard Module ──
 import { getPlayers } from "./players.js";
 
-let currentDiv = "all";
+
 let allMatches = [];
 let prevRanks = {};
 
@@ -85,12 +85,14 @@ function streakHtml(count, type) {
 }
 
 export function renderLeaderboard() {
-  // Read active skill filter
   const activeSkill = document.querySelector(".skill-tab.active");
-  const divFilter = activeSkill ? activeSkill.dataset.div : "all";
+  const div = activeSkill ? activeSkill.dataset.div : "all";
 
   const stats = buildStats(allMatches, getPlayers());
   let entries = Object.entries(stats).map(([name, s]) => ({ name, ...s, pct: winPct(s.wins, s.losses) }));
+  if (div && div !== "all") {
+    entries = entries.filter(p => (p.division||"").toLowerCase() === div);
+  }
 
   if (currentDiv !== "all") entries = entries.filter(e => e.division === currentDiv);
   entries.sort((a, b) => b.pct - a.pct || b.wins - a.wins || a.losses - b.losses);
@@ -123,14 +125,8 @@ export function renderLeaderboard() {
 }
 
 export function initLeaderboard() {
-  document.querySelectorAll(".div-tab").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".div-tab").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      currentDiv = btn.dataset.div;
-      renderLeaderboard();
-    });
-  });
+  // skill-tab filtering handled in app.js
+;
 }
 
 // ── Weekly MVP ──

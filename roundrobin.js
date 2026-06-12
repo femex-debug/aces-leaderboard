@@ -299,8 +299,18 @@ window._rrEnterKnockoutScore = async (rrId, stage, matchId, p1, p2) => {
 };
 
 window._rrDelete = async (rrId) => {
-  if (!confirm("Delete this round robin tournament?")) return;
-  await deleteDoc(doc(db, "rr_tournaments", rrId));
+  if (!confirm("Delete this round robin tournament? Match history on the leaderboard will be preserved.")) return;
+  try {
+    await deleteDoc(doc(db, "rr_tournaments", rrId));
+    // Clean up any scheduled entries tied to this tournament
+    const schedRef = collection(db, "scheduled");
+    const q = query(schedRef, where("tournamentId", "==", rrId));
+    const snap = await getDocs(q);
+    await Promise.all(snap.docs.map(d => deleteDoc(doc(db, "scheduled", d.id))));
+    console.log("Round robin deleted. Match history preserved on leaderboard.");
+  } catch (err) {
+    alert("Error deleting: " + err.message);
+  }
 };
 
 // ── RENDER ──
