@@ -12,7 +12,7 @@ import { initPending, updatePublicDropdowns } from "./pending.js";
 document.querySelectorAll(".tab").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p => { p.classList.remove("active"); p.style.display = "none"; });
     btn.classList.add("active");
     const panel = document.getElementById(btn.dataset.tab);
     if (panel) { panel.classList.add("active"); panel.style.display = "block"; }

@@ -80,8 +80,8 @@ function buildStats(matches, players) {
 function streakHtml(count, type) {
   if (!count) return "—";
   return type === "W"
-    ? `<span class="streak-fire">🔥W${count}</span>`
-    : `<span class="streak-ice">❄️L${count}</span>`;
+    ? `<span class="streak-hot">🔥W${count}</span>`
+    : `<span class="streak-cold">❄️L${count}</span>`;
 }
 
 export function renderLeaderboard() {
@@ -94,7 +94,6 @@ export function renderLeaderboard() {
     entries = entries.filter(p => (p.division||"").toLowerCase() === div);
   }
 
-  if (currentDiv !== "all") entries = entries.filter(e => e.division === currentDiv);
   entries.sort((a, b) => b.pct - a.pct || b.wins - a.wins || a.losses - b.losses);
 
   const tbody = document.querySelector("#leaderboard-table tbody");

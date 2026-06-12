@@ -117,8 +117,8 @@ header {
 .tab.active { color: var(--gold-2); border-bottom-color: var(--gold); }
 
 /* ─── PANELS ─── */
-.panel { display: none; padding: 20px; }
-.panel.active { display: block; animation: slideUp 0.2s ease; }
+.panel { display: none !important; padding: 20px; }
+.panel.active { display: block !important; animation: slideUp 0.2s ease; }
 
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(8px); }
