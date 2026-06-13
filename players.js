@@ -1,4 +1,6 @@
 // ── Players Module ──
+let onPlayerSkillSetCallback = null;
+export function onPlayerSkillSet(cb) { onPlayerSkillSetCallback = cb; }
 import { db, collection, doc, addDoc, setDoc, deleteDoc, getDocs, onSnapshot, query, orderBy, where } from "./firebase.js";
 import { getIsAdmin } from "./admin.js";
 
@@ -131,6 +133,9 @@ window._setSkillLevel = async (playerId, level) => {
   if (!level) return;
   try {
     await setDoc(doc(db, "players", playerId), { division: level }, { merge: true });
+    // Notify app that skill level was set (app.js wires this to round robin)
+    const player = playersList.find(p => p.id === playerId);
+    if (player && onPlayerSkillSetCallback) onPlayerSkillSetCallback(player.name, level);
   } catch (err) {
     alert("Error updating skill level: " + err.message);
   }

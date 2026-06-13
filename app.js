@@ -1,12 +1,12 @@
 // ── Main App Entry ──
-import { initAdmin } from "./admin.js";
-import { initPlayers, setOnPlayersChange, renderSkillAssignment } from "./players.js";
+import { initAdmin, onAdminChange } from "./admin.js";
+import { initPlayers, setOnPlayersChange, renderSkillAssignment, onPlayerSkillSet } from "./players.js";
 import { initLeaderboard, renderLeaderboard } from "./leaderboard.js";
 import { initMatches } from "./matches.js";
 import { initSchedule } from "./schedule.js";
 import { initTournament } from "./tournament.js";
-import { initRoundRobin } from "./roundrobin.js";
-import { initPending, updatePublicDropdowns } from "./pending.js";
+import { initRoundRobin, renderRRPage, addPlayerToRoundRobin, setRRAdminMode } from "./roundrobin.js";
+import { initPending, updatePublicDropdowns, onPlayerApproved } from "./pending.js";
 
 // Main tabs
 document.querySelectorAll(".tab").forEach(btn => {
@@ -17,6 +17,7 @@ document.querySelectorAll(".tab").forEach(btn => {
     const panel = document.getElementById(btn.dataset.tab);
     if (panel) { panel.classList.add("active"); panel.style.display = "block"; }
     if (btn.dataset.tab === "admin-panel") renderSkillAssignment();
+    if (btn.dataset.tab === "roundrobin") renderRRPage();
   });
 });
 
@@ -40,9 +41,17 @@ initTournament();
 initRoundRobin();
 initPending();
 
+// Wire admin login/logout to round robin admin mode
+onAdminChange((isAdmin) => setRRAdminMode(isAdmin));
+
+// Wire player additions to round robin auto-enrollment
+onPlayerSkillSet((name, division) => addPlayerToRoundRobin(name, division));
+onPlayerApproved((name, division) => addPlayerToRoundRobin(name, division));
+
 // Re-render when roster changes
 setOnPlayersChange(() => {
   renderLeaderboard();
   renderSkillAssignment();
   updatePublicDropdowns();
+  renderRRPage();
 });

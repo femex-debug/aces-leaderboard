@@ -1,4 +1,6 @@
 // ── Admin Module ──
+let onAdminChangeCallback = null;
+export function onAdminChange(cb) { onAdminChangeCallback = cb; }
 import { db, doc, getDoc, setDoc } from "./firebase.js";
 
 let isAdmin = false;
@@ -11,7 +13,6 @@ function showAdminUI(show) {
   // Show admin-only tabs and elements
   document.querySelectorAll(".admin-only").forEach(el => el.classList.toggle("hidden", !show));
   document.getElementById("admin-toggle").textContent = show ? "🔓" : "🔒";
-  document.querySelectorAll(".admin-only").forEach(el => el.classList.toggle("hidden", !show));
 }
 
 export function initAdmin() {
@@ -48,7 +49,7 @@ export function initAdmin() {
     document.getElementById("pin-modal").classList.add("hidden");
   });
 
-  document.getElementById("admin-logout").addEventListener("click", () => showAdminUI(false));
+  document.getElementById("admin-logout").addEventListener("click", () => { showAdminUI(false); if (onAdminChangeCallback) onAdminChangeCallback(false); });
 
   // Season management
   initSeasonManagement();

@@ -1,12 +1,12 @@
 // ── Round Robin Tournament Module ──
 import { getCurrentSeason } from "./matches.js";
 import { db, collection, doc, addDoc, setDoc, deleteDoc, getDocs, onSnapshot, query, where } from "./firebase.js";
-import { getIsAdmin } from "./admin.js";
 import { getPlayers } from "./players.js";
-import { determineWinner } from "./matches.js";
 
 const RR_START = "2026-06-15";
 let rrTournaments = {}; // { id: data }
+let _isAdmin = false;
+export function setRRAdminMode(val) { _isAdmin = val; renderRRPage(); }
 
 export function initRoundRobin() {
   // Listen to rr_tournaments collection
@@ -37,16 +37,17 @@ function assignGroups(players, division) {
   };
 }
 
-// Generate assigned matchups: 2 per player per week
-// Round-robin schedule using circle method
-function generateMatchups(players) {
+// ── DOUBLE ROUND ROBIN using circle method ──
+// Returns flat array of all matchup pairs — everyone plays everyone twice
+function generateDoubleRRMatchups(players) {
   const list = [...players];
   if (list.length % 2 !== 0) list.push("BYE");
   const n = list.length;
-  const rounds = [];
+  const allRounds = [];
   const fixed = list[0];
   const rotating = list.slice(1);
 
+  // First pass — everyone plays everyone once
   for (let r = 0; r < n - 1; r++) {
     const round = [];
     const circle = [fixed, ...rotating];
@@ -55,25 +56,72 @@ function generateMatchups(players) {
       const p2 = circle[n - 1 - i];
       if (p1 !== "BYE" && p2 !== "BYE") round.push([p1, p2]);
     }
-    rounds.push(round);
+    allRounds.push(round);
     rotating.push(rotating.shift());
   }
-  return rounds; // array of rounds, each round is array of [p1,p2] pairs
+
+  // Second pass — reverse all matchups so everyone plays everyone a second time
+  const firstPass = JSON.parse(JSON.stringify(allRounds));
+  firstPass.forEach(round => {
+    allRounds.push(round.map(([p1, p2]) => [p2, p1]));
+  });
+
+  return allRounds; // double round robin
 }
 
-// Assign 2 matchups per player per week
+// Pack rounds into weeks — 2 rounds per week (2 assigned matches per player per week)
 function buildWeeklyAssignments(rounds) {
   const weeks = [];
-  let roundIdx = 0;
-  // Each week gets 2 rounds worth of matches (2 assigned per player)
-  while (roundIdx < rounds.length) {
+  let idx = 0;
+  while (idx < rounds.length) {
     const weekMatches = [];
-    for (let r = 0; r < 2 && roundIdx < rounds.length; r++, roundIdx++) {
-      weekMatches.push(...rounds[roundIdx]);
+    for (let r = 0; r < 2 && idx < rounds.length; r++, idx++) {
+      weekMatches.push(...rounds[idx]);
     }
     weeks.push(weekMatches);
   }
   return weeks;
+}
+
+// Generate matchups for a NEW player joining mid-tournament
+// Only generates matches for remaining weeks (weeks not yet completed)
+function generateRemainingMatchups(newPlayer, existingPlayers, completedWeekCount) {
+  // New player plays everyone in the group twice (once each direction)
+  const allMatchups = [];
+  existingPlayers.forEach(p => {
+    allMatchups.push([newPlayer, p]);  // new player serves first
+    allMatchups.push([p, newPlayer]);  // existing player serves first
+  });
+
+  // Pack into weeks of 2 matches per player
+  const weeks = [];
+  let idx = 0;
+  while (idx < allMatchups.length) {
+    // Find matches where new player isn't double-booked in same week
+    const week = [];
+    const seenThisWeek = new Set();
+    const tempRemaining = [];
+    for (let i = idx; i < allMatchups.length; i++) {
+      const [p1, p2] = allMatchups[i];
+      if (!seenThisWeek.has(p1) && !seenThisWeek.has(p2) && week.length < 2) {
+        week.push([p1, p2]);
+        seenThisWeek.add(p1);
+        seenThisWeek.add(p2);
+      } else {
+        tempRemaining.push(allMatchups[i]);
+      }
+    }
+    if (week.length) weeks.push(week);
+    else break;
+    idx = allMatchups.length - tempRemaining.length;
+    allMatchups.splice(0, allMatchups.length, ...tempRemaining);
+    idx = 0;
+    if (!allMatchups.length) break;
+  }
+
+  // Pad with empty weeks to align with completed weeks so new matchups start at the right week
+  const padded = Array.from({ length: completedWeekCount }, () => []);
+  return [...padded, ...weeks];
 }
 
 // ── CREATE ROUND ROBIN ──
@@ -86,8 +134,8 @@ async function createRoundRobin(division) {
     return;
   }
 
-  const matchupsA = generateMatchups(groups.A);
-  const matchupsB = generateMatchups(groups.B);
+  const matchupsA = generateDoubleRRMatchups(groups.A);
+  const matchupsB = generateDoubleRRMatchups(groups.B);
   const weeklyA = buildWeeklyAssignments(matchupsA);
   const weeklyB = buildWeeklyAssignments(matchupsB);
 
@@ -115,6 +163,74 @@ async function createRoundRobin(division) {
   } catch (err) {
     alert("Error creating tournament: " + err.message);
     console.error(err);
+  }
+}
+
+// ── AUTO-ADD NEW PLAYER TO ACTIVE ROUND ROBIN ──
+export async function addPlayerToRoundRobin(playerName, division) {
+  // Find active round robin for this division
+  const active = Object.values(rrTournaments).find(t =>
+    t.status === "active" && t.division === division
+  );
+  if (!active) return; // No active tournament for this division — nothing to do
+
+  const t = active;
+
+  // Pick the smaller group to keep balance
+  const groupA = t.groups?.A?.players || [];
+  const groupB = t.groups?.B?.players || [];
+
+  // Don't add if already in tournament
+  if (groupA.includes(playerName) || groupB.includes(playerName)) return;
+
+  const grp = groupA.length <= groupB.length ? "A" : "B";
+  const existingPlayers = grp === "A" ? groupA : groupB;
+
+  // Calculate how many weeks have already been completed
+  // A week is considered done if any match from it has been played
+  const existingWeeklyMatchups = t.groups?.[grp]?.weeklyMatchups || [];
+  const completedWeekCount = existingWeeklyMatchups.findIndex(week =>
+    week.some(([p1, p2]) =>
+      !(t.matches || []).some(m =>
+        m.group === grp && !m.isSemiFinal && !m.isFinal &&
+        ((m.p1===p1&&m.p2===p2)||(m.p1===p2&&m.p2===p1))
+      )
+    )
+  );
+  const doneWeeks = completedWeekCount === -1 ? existingWeeklyMatchups.length : Math.max(0, completedWeekCount);
+
+  // Generate remaining matchups for new player
+  const newMatchups = generateRemainingMatchups(playerName, existingPlayers, doneWeeks);
+
+  // Merge new player's matchups into the existing weekly schedule
+  // Extend existing weeks or append new weeks
+  const updatedWeekly = [...existingWeeklyMatchups];
+  newMatchups.forEach((week, wi) => {
+    if (week.length === 0) return; // skip pad weeks
+    if (updatedWeekly[wi]) {
+      updatedWeekly[wi] = [...updatedWeekly[wi], ...week];
+    } else {
+      updatedWeekly[wi] = week;
+    }
+  });
+
+  // Build updated groups and standings
+  const updatedGroups = JSON.parse(JSON.stringify(t.groups));
+  updatedGroups[grp].players = [...existingPlayers, playerName];
+  updatedGroups[grp].weeklyMatchups = updatedWeekly;
+
+  const updatedStandings = JSON.parse(JSON.stringify(t.standings || {}));
+  if (!updatedStandings[grp]) updatedStandings[grp] = {};
+  updatedStandings[grp][playerName] = { played: 0, setWins: 0, setLosses: 0, matchWins: 0 };
+
+  try {
+    await setDoc(doc(db, "rr_tournaments", t.id), {
+      groups: updatedGroups,
+      standings: updatedStandings
+    }, { merge: true });
+    console.log(`${playerName} added to ${division} Round Robin Group ${grp}`);
+  } catch (err) {
+    console.error("Error adding player to round robin:", err);
   }
 }
 
@@ -317,10 +433,10 @@ window._rrDelete = async (rrId) => {
 };
 
 // ── RENDER ──
-function renderRRPage() {
+export function renderRRPage() {
   const container = document.getElementById("rr-container");
   if (!container) return;
-  const isAdmin = getIsAdmin();
+  const isAdmin = _isAdmin;
 
   let html = "";
 

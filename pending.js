@@ -9,6 +9,8 @@ import { getPlayers } from "./players.js";
 
 let pendingMatches = [];
 let pendingPlayers = [];
+let onPlayerApprovedCallback = null;
+export function onPlayerApproved(cb) { onPlayerApprovedCallback = cb; }
 
 export function initPending() {
   // Listen to pending collections
@@ -232,6 +234,8 @@ window._approvePlayer = async (id) => {
       division: p.division
     });
     await deleteDoc(doc(db, "pending_players", id));
+    // Notify app that player was approved
+    if (onPlayerApprovedCallback) onPlayerApprovedCallback(p.name, p.division);
   } catch (err) {
     alert("Error approving player: " + err.message);
   }
