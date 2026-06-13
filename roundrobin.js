@@ -1,12 +1,13 @@
 // ── Round Robin Tournament Module ──
 import { getCurrentSeason } from "./matches.js";
 import { db, collection, doc, addDoc, setDoc, deleteDoc, getDocs, onSnapshot, query, where } from "./firebase.js";
+import { getIsAdmin } from "./admin.js";
 import { getPlayers } from "./players.js";
 
 const RR_START = "2026-06-15";
 let rrTournaments = {}; // { id: data }
-let _isAdmin = false;
-export function setRRAdminMode(val) { _isAdmin = val; renderRRPage(); }
+// Admin state read directly from admin.js — no local copy needed
+export function setRRAdminMode(val) { renderRRPage(); } // kept for app.js compatibility
 
 export function initRoundRobin() {
   // Listen to rr_tournaments collection
@@ -436,7 +437,7 @@ window._rrDelete = async (rrId) => {
 export function renderRRPage() {
   const container = document.getElementById("rr-container");
   if (!container) return;
-  const isAdmin = _isAdmin;
+  const isAdmin = getIsAdmin();
 
   let html = "";
 

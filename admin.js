@@ -33,6 +33,7 @@ export function initAdmin() {
     if (!snap.exists()) { msg.textContent = "No PIN set yet. Use the form below."; msg.className = "msg-err"; return; }
     if (snap.data().pin === pin) {
       showAdminUI(true);
+      if (onAdminChangeCallback) onAdminChangeCallback(true);
       document.getElementById("pin-modal").classList.add("hidden");
       document.getElementById("pin-input").value = "";
       msg.textContent = "";
@@ -46,6 +47,7 @@ export function initAdmin() {
     if (snap.exists()) { document.getElementById("pin-msg").textContent = "PIN already set. Login first to change it."; return; }
     await setDoc(doc(db, "config", "admin"), { pin });
     showAdminUI(true);
+    if (onAdminChangeCallback) onAdminChangeCallback(true);
     document.getElementById("pin-modal").classList.add("hidden");
   });
 
