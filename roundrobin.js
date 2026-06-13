@@ -128,106 +128,132 @@ function generateRemainingMatchups(newPlayer, existingPlayers, completedWeekCoun
 // ── CREATE ROUND ROBIN ──
 async function createRoundRobin(division) {
   const players = getPlayers();
-  const groups = assignGroups(players, division);
+  const groups  = assignGroups(players, division);
 
   if (groups.A.length < 2 && groups.B.length < 2) {
-    alert(`Not enough ${division} players. Assign skill levels first.`);
+    alert(`Not enough ${division} players assigned. Go to Admin tab and assign skill levels first.`);
     return;
   }
 
-  const matchupsA = generateDoubleRRMatchups(groups.A);
-  const matchupsB = generateDoubleRRMatchups(groups.B);
-  const weeklyA = buildWeeklyAssignments(matchupsA);
-  const weeklyB = buildWeeklyAssignments(matchupsB);
+  const weeklyA = buildWeeklyAssignments(generateDoubleRRMatchups(groups.A));
+  const weeklyB = buildWeeklyAssignments(generateDoubleRRMatchups(groups.B));
+
+  // ── FLATTEN everything — Firestore cannot store arrays inside arrays ──
+  // schedule: flat map  "A_w0_m0" -> {p1,p2}
+  // players:  flat map  "A_0" -> "Name",  "A_count" -> N
+  // standings: flat map "A_stand_Name" -> {played,setWins,...}
+
+  const schedule  = {};
+  const playerMap = {};
+  const standings = {};
+
+  ["A","B"].forEach(grp => {
+    const grpPlayers = grp === "A" ? groups.A : groups.B;
+    const weekly     = grp === "A" ? weeklyA  : weeklyB;
+
+    // Players as indexed keys
+    playerMap[`${grp}_count`] = grpPlayers.length;
+    grpPlayers.forEach((name, i) => {
+      playerMap[`${grp}_${i}`] = name;
+    });
+
+    // Schedule as flat keys
+    weekly.forEach((week, wi) => {
+      week.forEach((match, mi) => {
+        schedule[`${grp}_w${wi}_m${mi}`] = { p1: match.p1, p2: match.p2 };
+      });
+      schedule[`${grp}_w${wi}_count`] = week.length;
+    });
+    schedule[`${grp}_weekCount`] = weekly.length;
+
+    // Standings as flat keys
+    grpPlayers.forEach(name => {
+      const key = `${grp}_${name.replace(/[.#$\[\]/]/g,"_")}`;
+      standings[key] = { name, group: grp, played: 0, setWins: 0, setLosses: 0, matchWins: 0 };
+    });
+  });
 
   const payload = {
     division,
     startDate: RR_START,
-    status: "active",
-    groups: {
-      A: { players: groups.A, weeklyMatchups: weeklyA },
-      B: { players: groups.B, weeklyMatchups: weeklyB }
-    },
-    standings: {
-      A: Object.fromEntries(groups.A.map(p => [p, { played: 0, setWins: 0, setLosses: 0, matchWins: 0 }])),
-      B: Object.fromEntries(groups.B.map(p => [p, { played: 0, setWins: 0, setLosses: 0, matchWins: 0 }]))
-    },
-    matches: [],
-    semifinals: null,
-    final: null,
-    champion: "",
-    createdAt: new Date().toISOString()
+    status:    "active",
+    playerMap,
+    schedule,
+    standings,
+    matchLog:   {},
+    semifinals: {},
+    final:      {},
+    champion:   "",
+    createdAt:  new Date().toISOString()
   };
 
   try {
     await addDoc(collection(db, "rr_tournaments"), payload);
   } catch (err) {
     alert("Error creating tournament: " + err.message);
-    console.error(err);
+    console.error("Payload that failed:", JSON.stringify(payload, null, 2));
   }
 }
 
 // ── AUTO-ADD NEW PLAYER TO ACTIVE ROUND ROBIN ──
 export async function addPlayerToRoundRobin(playerName, division) {
-  // Find active round robin for this division
   const active = Object.values(rrTournaments).find(t =>
     t.status === "active" && t.division === division
   );
-  if (!active) return; // No active tournament for this division — nothing to do
-
+  if (!active) return;
   const t = active;
 
-  // Pick the smaller group to keep balance
-  const groupA = t.groups?.A?.players || [];
-  const groupB = t.groups?.B?.players || [];
+  // Check not already in tournament
+  const grpA = getGroupPlayers(t, "A");
+  const grpB = getGroupPlayers(t, "B");
+  if (grpA.includes(playerName) || grpB.includes(playerName)) return;
 
-  // Don't add if already in tournament
-  if (groupA.includes(playerName) || groupB.includes(playerName)) return;
+  // Add to smaller group
+  const grp = grpA.length <= grpB.length ? "A" : "B";
+  const existingPlayers = grp === "A" ? grpA : grpB;
 
-  const grp = groupA.length <= groupB.length ? "A" : "B";
-  const existingPlayers = grp === "A" ? groupA : groupB;
+  // Work out which week we are at
+  const weekCount = t.schedule?.[`${grp}_weekCount`] || 0;
+  const doneWeeks = weekCount; // new player starts from next week
 
-  // Calculate how many weeks have already been completed
-  // A week is considered done if any match from it has been played
-  const existingWeeklyMatchups = t.groups?.[grp]?.weeklyMatchups || [];
-  const completedWeekCount = existingWeeklyMatchups.findIndex(week =>
-    week.some(([p1, p2]) =>
-      !(t.matches || []).some(m =>
-        m.group === grp && !m.isSemiFinal && !m.isFinal &&
-        ((m.p1===p1&&m.p2===p2)||(m.p1===p2&&m.p2===p1))
-      )
-    )
-  );
-  const doneWeeks = completedWeekCount === -1 ? existingWeeklyMatchups.length : Math.max(0, completedWeekCount);
-
-  // Generate remaining matchups for new player
-  const newMatchups = generateRemainingMatchups(playerName, existingPlayers, doneWeeks);
-
-  // Merge new player's matchups into the existing weekly schedule
-  // Extend existing weeks or append new weeks
-  const updatedWeekly = [...existingWeeklyMatchups];
-  newMatchups.forEach((week, wi) => {
-    if (week.length === 0) return; // skip pad weeks
-    if (updatedWeekly[wi]) {
-      updatedWeekly[wi] = [...updatedWeekly[wi], ...week];
-    } else {
-      updatedWeekly[wi] = week;
-    }
+  // Generate remaining matchups as flat schedule entries
+  const newSchedule = { ...t.schedule };
+  let startWeek = doneWeeks;
+  // Each existing player gets 2 matches against the new player (one each direction)
+  const matchups = [];
+  existingPlayers.forEach(p => {
+    matchups.push({ p1: playerName, p2: p });
+    matchups.push({ p1: p, p2: playerName });
   });
+  // Pack into weeks of 2
+  let wi = startWeek;
+  let idx = 0;
+  while (idx < matchups.length) {
+    let mi = 0;
+    for (let r = 0; r < 2 && idx < matchups.length; r++, idx++, mi++) {
+      newSchedule[`${grp}_w${wi}_m${mi}`] = matchups[idx];
+    }
+    newSchedule[`${grp}_w${wi}_count`] = mi;
+    wi++;
+  }
+  newSchedule[`${grp}_weekCount`] = wi;
 
-  // Build updated groups and standings
-  const updatedGroups = JSON.parse(JSON.stringify(t.groups));
-  updatedGroups[grp].players = [...existingPlayers, playerName];
-  updatedGroups[grp].weeklyMatchups = updatedWeekly;
+  // Update playerMap
+  const newPlayerMap = { ...t.playerMap };
+  const newCount = existingPlayers.length;
+  newPlayerMap[`${grp}_${newCount}`] = playerName;
+  newPlayerMap[`${grp}_count`] = newCount + 1;
 
-  const updatedStandings = JSON.parse(JSON.stringify(t.standings || {}));
-  if (!updatedStandings[grp]) updatedStandings[grp] = {};
-  updatedStandings[grp][playerName] = { played: 0, setWins: 0, setLosses: 0, matchWins: 0 };
+  // Update standings
+  const newStandings = { ...t.standings };
+  const key = `${grp}_${playerName.replace(/[.#$\[\]/]/g,"_")}`;
+  newStandings[key] = { name: playerName, group: grp, played:0, setWins:0, setLosses:0, matchWins:0 };
 
   try {
     await setDoc(doc(db, "rr_tournaments", t.id), {
-      groups: updatedGroups,
-      standings: updatedStandings
+      playerMap:  newPlayerMap,
+      schedule:   newSchedule,
+      standings:  newStandings
     }, { merge: true });
     console.log(`${playerName} added to ${division} Round Robin Group ${grp}`);
   } catch (err) {
@@ -235,7 +261,7 @@ export async function addPlayerToRoundRobin(playerName, division) {
   }
 }
 
-// ── ENTER MATCH SCORE ──
+
 window._rrEnterScore = async (rrId, group, p1, p2) => {
   const score = prompt(`Enter score for ${p1} vs ${p2}\nFormat: sets won by ${p1} - sets won by ${p2}\nExample: 2-1`);
   if (!score) return;
@@ -252,25 +278,25 @@ window._rrEnterScore = async (rrId, group, p1, p2) => {
   const loser  = winner === p1 ? p2 : p1;
 
   // Update standings
-  const st = JSON.parse(JSON.stringify(t.standings));
-  if (!st[group][p1]) st[group][p1] = { played:0, setWins:0, setLosses:0, matchWins:0 };
-  if (!st[group][p2]) st[group][p2] = { played:0, setWins:0, setLosses:0, matchWins:0 };
-
-  st[group][p1].played++;
-  st[group][p2].played++;
-  st[group][p1].setWins += p1Sets;
-  st[group][p1].setLosses += p2Sets;
-  st[group][p2].setWins += p2Sets;
-  st[group][p2].setLosses += p1Sets;
-  if (p1Sets > p2Sets) st[group][p1].matchWins++;
-  else st[group][p2].matchWins++;
+  // Update flat standings
+  const st = JSON.parse(JSON.stringify(t.standings || {}));
+  const k1 = `${group}_${p1.replace(/[.#$\[\]/]/g,"_")}`;
+  const k2 = `${group}_${p2.replace(/[.#$\[\]/]/g,"_")}`;
+  if (!st[k1]) st[k1] = { name: p1, group, played:0, setWins:0, setLosses:0, matchWins:0 };
+  if (!st[k2]) st[k2] = { name: p2, group, played:0, setWins:0, setLosses:0, matchWins:0 };
+  st[k1].played++;  st[k2].played++;
+  st[k1].setWins   += p1Sets; st[k1].setLosses += p2Sets;
+  st[k2].setWins   += p2Sets; st[k2].setLosses += p1Sets;
+  if (p1Sets > p2Sets) st[k1].matchWins++;
+  else st[k2].matchWins++;
 
   const matchRecord = {
     group, p1, p2, p1Sets, p2Sets, winner,
     date: new Date().toISOString()
   };
 
-  const updatedMatches = [...(t.matches || []), matchRecord];
+  const matchKey = `match_${Date.now()}`;
+  const updatedMatches = { ...(t.matchLog || {}), [matchKey]: matchRecord };
 
   // Check if top 2 from each group can be determined
   const { semis, final, champion } = checkAdvancement(t, st, updatedMatches);
@@ -278,7 +304,7 @@ window._rrEnterScore = async (rrId, group, p1, p2) => {
   try {
     await setDoc(doc(db, "rr_tournaments", rrId), {
       standings: st,
-      matches: updatedMatches,
+      matchLog: updatedMatches,  // use matchLog not matches to avoid Firestore array-of-arrays
       semifinals: semis || t.semifinals,
       final: final || t.final,
       champion: champion || t.champion || "",
@@ -308,17 +334,7 @@ window._rrEnterScore = async (rrId, group, p1, p2) => {
   }
 };
 
-function getTopTwo(standing) {
-  return Object.entries(standing)
-    .sort(([,a],[,b]) => {
-      if (b.setWins !== a.setWins) return b.setWins - a.setWins;
-      const aDiff = a.setWins - a.setLosses;
-      const bDiff = b.setWins - b.setLosses;
-      return bDiff - aDiff;
-    })
-    .slice(0, 2)
-    .map(([name]) => name);
-}
+
 
 function checkAdvancement(t, standings, matches) {
   const topA = getTopTwo(standings.A);
@@ -434,6 +450,73 @@ window._rrDelete = async (rrId) => {
 };
 
 // ── RENDER ──
+// ── HELPERS to read flat Firestore structure ──
+function getGroupPlayers(t, grp) {
+  // Support both new flat playerMap and old groupPlayers structure
+  if (t.playerMap) {
+    const count = t.playerMap[`${grp}_count`] || 0;
+    const players = [];
+    for (let i = 0; i < count; i++) {
+      const name = t.playerMap[`${grp}_${i}`];
+      if (name) players.push(name);
+    }
+    return players;
+  }
+  // Fallback for old structure
+  return t.groupPlayers?.[grp] || t.groups?.[grp]?.players || [];
+}
+
+function getGroupStandings(t, grp) {
+  // Support both new flat standings and old nested standings
+  if (t.standings) {
+    const result = {};
+    // New flat format: keys like "A_Name"
+    Object.entries(t.standings).forEach(([key, val]) => {
+      if (val && val.group === grp && val.name) {
+        result[val.name] = val;
+      }
+    });
+    // Old nested format: t.standings.A.Name
+    if (Object.keys(result).length === 0 && t.standings[grp]) {
+      return t.standings[grp];
+    }
+    return result;
+  }
+  return {};
+}
+
+function getWeeklySchedule(t, grp) {
+  if (!t.schedule) {
+    // Old weeklyMatchups structure
+    return t.groups?.[grp]?.weeklyMatchups || [];
+  }
+  const weekCount = t.schedule[`${grp}_weekCount`] || 0;
+  const weeks = [];
+  for (let wi = 0; wi < weekCount; wi++) {
+    const matchCount = t.schedule[`${grp}_w${wi}_count`] || 0;
+    const week = [];
+    for (let mi = 0; mi < matchCount; mi++) {
+      const m = t.schedule[`${grp}_w${wi}_m${mi}`];
+      if (m) week.push(m);
+    }
+    if (week.length) weeks.push(week);
+  }
+  return weeks;
+}
+
+function getTopTwo(standing) {
+  return Object.values(standing)
+    .sort((a, b) => {
+      const aName = a.name || a; const bName = b.name || b;
+      const sa = typeof a === 'object' ? a : {setWins:0,setLosses:0,matchWins:0};
+      const sb = typeof b === 'object' ? b : {setWins:0,setLosses:0,matchWins:0};
+      if (sb.setWins !== sa.setWins) return sb.setWins - sa.setWins;
+      return (sb.setWins - sb.setLosses) - (sa.setWins - sa.setLosses);
+    })
+    .slice(0, 2)
+    .map(s => s.name || s);
+}
+
 export function renderRRPage() {
   const container = document.getElementById("rr-container");
   if (!container) return;
@@ -480,11 +563,11 @@ export function renderRRPage() {
     html += `<div class="rr-groups">`;
 
     ["A","B"].forEach(grp => {
-      const group = t.groups?.[grp];
-      const standing = t.standings?.[grp] || {};
-      if (!group) return;
+      const groupPlayers = getGroupPlayers(t, grp);
+      const standing     = getGroupStandings(t, grp);
+      if (!groupPlayers.length) return;
 
-      const sorted = [...group.players].sort((a,b) => {
+      const sorted = [...groupPlayers].sort((a,b) => {
         const sa = standing[a] || {setWins:0,setLosses:0,matchWins:0};
         const sb = standing[b] || {setWins:0,setLosses:0,matchWins:0};
         if (sb.setWins !== sa.setWins) return sb.setWins - sa.setWins;
@@ -498,7 +581,8 @@ export function renderRRPage() {
       html += `<table class="rr-table" style="margin-bottom:12px">`;
       html += `<tr><th style="text-align:left">Player</th><th>SW</th><th>SL</th><th>W</th></tr>`;
       sorted.forEach((p,i) => {
-        const s = standing[p] || {setWins:0,setLosses:0,matchWins:0,played:0};
+        const raw = standing[p] || {};
+        const s = {setWins: raw.setWins||0, setLosses: raw.setLosses||0, matchWins: raw.matchWins||0, played: raw.played||0};
         const isTop = i < 2 && s.played > 0;
         html += `<tr class="${isTop?"top-row":""}">
           <td>${isTop?"":""}${p}</td>
@@ -510,7 +594,7 @@ export function renderRRPage() {
       html += `</table>`;
 
       // Weekly matchups
-      const weekly = group.weeklyMatchups || [];
+      const weekly = getWeeklySchedule(t, grp);
       if (weekly.length) {
         weekly.forEach((weekMatches,wi) => {
           html += `<div class="rr-week-label">Week ${wi+1}</div>`;
@@ -518,7 +602,7 @@ export function renderRRPage() {
             const mp1 = matchup.p1 || (Array.isArray(matchup) ? matchup[0] : "");
             const mp2 = matchup.p2 || (Array.isArray(matchup) ? matchup[1] : "");
             if (!mp1 || !mp2) return;
-            const played = (t.matches||[]).some(m =>
+            const played = (Object.values(t.matchLog||{}) ).some(m =>
               !m.isSemiFinal && !m.isFinal && m.group===grp &&
               ((m.p1===mp1&&m.p2===mp2)||(m.p1===mp2&&m.p2===mp1))
             );
@@ -531,7 +615,7 @@ export function renderRRPage() {
       }
 
       // Match history
-      const history = (t.matches||[]).filter(m => m.group===grp && !m.isSemiFinal && !m.isFinal);
+      const history = Object.values(t.matchLog||{}).filter(m => m.group===grp && !m.isSemiFinal && !m.isFinal);
       if (history.length) {
         html += `<div class="rr-week-label" style="margin-top:10px">Match History</div>`;
         history.slice().reverse().forEach(m => {
@@ -549,12 +633,12 @@ export function renderRRPage() {
         html += `<div style="margin-top:10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <select id="rr-${t.id}-${grp}-p1" style="flex:1;min-width:100px;font-size:11px;padding:5px 8px">
             <option value="">Player 1</option>
-            ${group.players.map(p=>`<option value="${p}">${p}</option>`).join("")}
+            ${groupPlayers.map(p=>`<option value="${p}">${p}</option>`).join("")}
           </select>
           <span style="font-size:11px;color:var(--muted)">vs</span>
           <select id="rr-${t.id}-${grp}-p2" style="flex:1;min-width:100px;font-size:11px;padding:5px 8px">
             <option value="">Player 2</option>
-            ${group.players.map(p=>`<option value="${p}">${p}</option>`).join("")}
+            ${groupPlayers.map(p=>`<option value="${p}">${p}</option>`).join("")}
           </select>
           <button class="btn-secondary btn-xs" onclick="
             var p1=document.getElementById('rr-${t.id}-${grp}-p1').value;
@@ -571,8 +655,8 @@ export function renderRRPage() {
     html += `</div>`; // rr-groups
 
     // Knockout stage
-    const topA = getTopTwo(t.standings?.A || {});
-    const topB = getTopTwo(t.standings?.B || {});
+    const topA = getTopTwo(getGroupStandings(t, 'A'));
+    const topB = getTopTwo(getGroupStandings(t, 'B'));
     if (topA.length >= 2 && topB.length >= 2) {
       const semis = t.semifinals;
       const fin = t.final;
