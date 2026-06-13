@@ -55,7 +55,7 @@ function generateDoubleRRMatchups(players) {
     for (let i = 0; i < n / 2; i++) {
       const p1 = circle[i];
       const p2 = circle[n - 1 - i];
-      if (p1 !== "BYE" && p2 !== "BYE") round.push([p1, p2]);
+      if (p1 !== "BYE" && p2 !== "BYE") round.push({p1, p2});
     }
     allRounds.push(round);
     rotating.push(rotating.shift());
@@ -64,7 +64,7 @@ function generateDoubleRRMatchups(players) {
   // Second pass — reverse all matchups so everyone plays everyone a second time
   const firstPass = JSON.parse(JSON.stringify(allRounds));
   firstPass.forEach(round => {
-    allRounds.push(round.map(([p1, p2]) => [p2, p1]));
+    allRounds.push(round.map(m => ({p1: m.p2, p2: m.p1})));
   });
 
   return allRounds; // double round robin
@@ -90,8 +90,8 @@ function generateRemainingMatchups(newPlayer, existingPlayers, completedWeekCoun
   // New player plays everyone in the group twice (once each direction)
   const allMatchups = [];
   existingPlayers.forEach(p => {
-    allMatchups.push([newPlayer, p]);  // new player serves first
-    allMatchups.push([p, newPlayer]);  // existing player serves first
+    allMatchups.push({p1: newPlayer, p2: p});
+    allMatchups.push({p1: p, p2: newPlayer});
   });
 
   // Pack into weeks of 2 matches per player
@@ -103,9 +103,9 @@ function generateRemainingMatchups(newPlayer, existingPlayers, completedWeekCoun
     const seenThisWeek = new Set();
     const tempRemaining = [];
     for (let i = idx; i < allMatchups.length; i++) {
-      const [p1, p2] = allMatchups[i];
+      const {p1, p2} = allMatchups[i];
       if (!seenThisWeek.has(p1) && !seenThisWeek.has(p2) && week.length < 2) {
-        week.push([p1, p2]);
+        week.push({p1, p2});
         seenThisWeek.add(p1);
         seenThisWeek.add(p2);
       } else {
@@ -501,7 +501,7 @@ export function renderRRPage() {
         const s = standing[p] || {setWins:0,setLosses:0,matchWins:0,played:0};
         const isTop = i < 2 && s.played > 0;
         html += `<tr class="${isTop?"top-row":""}">
-          <td>${isTop?"🏆 ":""}${p}</td>
+          <td>${isTop?"":""}${p}</td>
           <td>${s.setWins}</td>
           <td>${s.setLosses}</td>
           <td>${s.matchWins}</td>
@@ -514,13 +514,16 @@ export function renderRRPage() {
       if (weekly.length) {
         weekly.forEach((weekMatches,wi) => {
           html += `<div class="rr-week-label">Week ${wi+1}</div>`;
-          weekMatches.forEach(([mp1,mp2]) => {
+          weekMatches.forEach(matchup => {
+            const mp1 = matchup.p1 || (Array.isArray(matchup) ? matchup[0] : "");
+            const mp2 = matchup.p2 || (Array.isArray(matchup) ? matchup[1] : "");
+            if (!mp1 || !mp2) return;
             const played = (t.matches||[]).some(m =>
               !m.isSemiFinal && !m.isFinal && m.group===grp &&
               ((m.p1===mp1&&m.p2===mp2)||(m.p1===mp2&&m.p2===mp1))
             );
             html += `<div class="rr-matchup${played?" played":""}">
-              <span style="font-size:12px">${played?"✅ ":""}${mp1} <b>vs</b> ${mp2}</span>
+              <span style="font-size:12px">${played?"<span class=\'done-tag\'>Done</span> ":""}${mp1} <span class=\'vs-sep\'>vs</span> ${mp2}</span>
               ${isAdmin && !played && t.status==="active" ? `<button class="btn-secondary btn-xs" onclick="window._rrEnterScore('${t.id}','${grp}','${mp1}','${mp2}')">Score</button>` : ""}
             </div>`;
           });
