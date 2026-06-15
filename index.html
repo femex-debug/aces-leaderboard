@@ -93,21 +93,15 @@
         <div class="panel-title">Upcoming Matches</div>
         <div class="panel-sub">Scheduled and tournament matchups</div>
       </div>
+      <div class="skill-filter-tabs">
+        <button class="sched-div-tab skill-tab" data-sdiv="experienced">Experienced</button>
+        <button class="sched-div-tab skill-tab" data-sdiv="beginner">Beginner</button>
+      </div>
     </div>
 
     <datalist id="player-list"></datalist>
-    <div class="schedule-split">
-      <div>
-        <div class="rr-group-title">Experienced</div>
-        <ul id="schedule-list-experienced" class="match-list"></ul>
-        <div id="rr-schedule-experienced"></div>
-      </div>
-      <div>
-        <div class="rr-group-title">Beginner</div>
-        <ul id="schedule-list-beginner" class="match-list"></ul>
-        <div id="rr-schedule-beginner"></div>
-      </div>
-    </div>
+    <ul id="schedule-list" class="match-list"></ul>
+    <div id="rr-schedule-section"></div>
     <div id="sched-empty" class="empty-state hidden">
       <div class="empty-icon"></div>
       <div class="empty-title">No upcoming matches</div>

@@ -4,6 +4,7 @@ import { getIsAdmin } from "./admin.js";
 import { renderRRSchedule } from "./roundrobin.js";
 
 let scheduled = [];
+let schedDivFilter = "experienced";
 
 export function initSchedule() {
   const ref = collection(db, "scheduled");
@@ -19,6 +20,19 @@ export function initSchedule() {
   }, err => {
     console.error("Schedule listener error:", err);
   });
+
+  // Division toggle tabs
+  document.querySelectorAll(".sched-div-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".sched-div-tab").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      schedDivFilter = btn.dataset.sdiv;
+      renderScheduleList();
+    });
+  });
+  // Default active
+  const defaultTab = document.querySelector('.sched-div-tab[data-sdiv="experienced"]');
+  if (defaultTab) defaultTab.classList.add("active");
 
   document.getElementById("schedule-form").addEventListener("submit", async e => {
     e.preventDefault();
@@ -52,21 +66,20 @@ export function initSchedule() {
 }
 
 function renderScheduleList() {
-  const upcoming = scheduled.filter(s => s.status === "upcoming");
-  const expList = document.getElementById("schedule-list-experienced");
-  const begList = document.getElementById("schedule-list-beginner");
+  const list = document.getElementById("schedule-list");
+  const upcoming = scheduled.filter(s =>
+    s.status === "upcoming" && (s.division || "").toLowerCase() === schedDivFilter
+  );
 
-  const expMatches = upcoming.filter(s => (s.division || "").toLowerCase() === "experienced");
-  const begMatches = upcoming.filter(s => (s.division || "").toLowerCase() === "beginner");
+  if (!upcoming.length) {
+    list.innerHTML = `<li style="color:var(--muted);text-align:center">No upcoming ${schedDivFilter} matches</li>`;
+  } else {
+    list.innerHTML = upcoming.map(renderMatchItem).join("");
+  }
 
-  expList.innerHTML = expMatches.length ? expMatches.map(renderMatchItem).join("") : "<li>No matches</li>";
-  begList.innerHTML = begMatches.length ? begMatches.map(renderMatchItem).join("") : "<li>No matches</li>";
-
-  // RR matchups split by division
-  const rrExp = document.getElementById("rr-schedule-experienced");
-  const rrBeg = document.getElementById("rr-schedule-beginner");
-  if (rrExp) rrExp.innerHTML = renderRRSchedule("experienced");
-  if (rrBeg) rrBeg.innerHTML = renderRRSchedule("beginner");
+  // RR matchups filtered by active toggle
+  const rrEl = document.getElementById("rr-schedule-section");
+  if (rrEl) rrEl.innerHTML = renderRRSchedule(schedDivFilter);
 }
 
 function renderMatchItem(s) {

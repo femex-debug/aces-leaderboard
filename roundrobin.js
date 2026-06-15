@@ -583,10 +583,12 @@ export function renderRRPage() {
   const isAdmin = getIsAdmin();
 
   // Also update RR matchups in the Schedule tab
-  const rrExp = document.getElementById("rr-schedule-experienced");
-  const rrBeg = document.getElementById("rr-schedule-beginner");
-  if (rrExp) rrExp.innerHTML = renderRRSchedule("experienced");
-  if (rrBeg) rrBeg.innerHTML = renderRRSchedule("beginner");
+  const rrEl = document.getElementById("rr-schedule-section");
+  if (rrEl) {
+    const activeTab = document.querySelector(".sched-div-tab.active");
+    const filter = activeTab ? activeTab.dataset.sdiv : "experienced";
+    rrEl.innerHTML = renderRRSchedule(filter);
+  }
 
   let html = "";
 
