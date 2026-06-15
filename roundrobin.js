@@ -171,7 +171,7 @@ export async function addPlayerToRoundRobin(playerName, division) {
   const grp = grpA.length <= grpB.length ? "A" : "B";
   const existingPlayers = grp === "A" ? grpA : grpB;
 
-  // Append new weeks starting after existing schedule
+  // Distribute new matchups starting from week 1 across existing weeks
   const existingWeekCount = t.schedule?.[`${grp}_weekCount`] || 0;
 
   const newSchedule = { ...t.schedule };
@@ -183,17 +183,19 @@ export async function addPlayerToRoundRobin(playerName, division) {
     matchups.push({ p1: p, p2: playerName });
   });
 
-  // Pack into weeks of 2 matches each
-  let wi = existingWeekCount;
-  for (let idx = 0; idx < matchups.length; idx += 2) {
-    const weekMatches = matchups.slice(idx, idx + 2);
-    weekMatches.forEach((m, mi) => {
-      newSchedule[`${grp}_w${wi}_m${mi}`] = m;
-    });
-    newSchedule[`${grp}_w${wi}_count`] = weekMatches.length;
-    wi++;
+  // Spread matchups across weeks starting from week 0 (1 match per week)
+  const totalWeeks = Math.max(existingWeekCount, matchups.length);
+  for (let idx = 0; idx < matchups.length; idx++) {
+    const wi = idx % totalWeeks;
+    // Find next available match slot in this week
+    const currentCount = newSchedule[`${grp}_w${wi}_count`] || 0;
+    newSchedule[`${grp}_w${wi}_m${currentCount}`] = matchups[idx];
+    newSchedule[`${grp}_w${wi}_count`] = currentCount + 1;
   }
-  newSchedule[`${grp}_weekCount`] = wi;
+  // Ensure weekCount covers any new weeks added
+  if (totalWeeks > existingWeekCount) {
+    newSchedule[`${grp}_weekCount`] = totalWeeks;
+  }
 
   // Update playerMap
   const newPlayerMap = { ...t.playerMap };
@@ -291,6 +293,26 @@ window._rrEnterScore = async (rrId, group, p1, p2) => {
   }
 };
 
+// Player submits RR score — goes to pending for admin approval
+window._rrSubmitScore = async (rrId, group, p1, p2) => {
+  const score = prompt(`Enter score for ${p1} vs ${p2}\nFormat: sets won, e.g. 2-1 or 6-3, 6-4`);
+  if (!score || !score.trim()) return;
+  try {
+    await addDoc(collection(db, "pending_matches"), {
+      player1: p1,
+      player2: p2,
+      score: score.trim(),
+      source: "roundrobin",
+      rrId,
+      rrGroup: group,
+      submittedAt: new Date().toISOString(),
+      status: "pending"
+    });
+    alert("✅ Score submitted! Awaiting admin approval.");
+  } catch (err) {
+    alert("Error submitting: " + err.message);
+  }
+};
 
 
 function checkAdvancement(t, standings, matchLog) {
@@ -578,7 +600,7 @@ export function renderRRPage() {
             );
             html += `<div class="rr-matchup${played?" played":""}">
               <span style="font-size:12px">${played?"<span class=\'done-tag\'>Done</span> ":""}${mp1} <span class=\'vs-sep\'>vs</span> ${mp2}</span>
-              ${isAdmin && !played && t.status==="active" ? `<button class="btn-secondary btn-xs" onclick="window._rrEnterScore('${t.id}','${grp}','${mp1}','${mp2}')">Score</button>` : ""}
+              ${!played && t.status==="active" ? (isAdmin ? `<button class="btn-secondary btn-xs" onclick="window._rrEnterScore('${t.id}','${grp}','${mp1}','${mp2}')">Score</button>` : `<button class="btn-secondary btn-xs" onclick="window._rrSubmitScore('${t.id}','${grp}','${mp1}','${mp2}')">Submit Score</button>`) : ""}
             </div>`;
           });
         });
@@ -624,53 +646,57 @@ export function renderRRPage() {
 
     html += `</div>`; // rr-groups
 
-    // Knockout stage
-    const topA = getTopTwo(getGroupStandings(t, 'A'));
-    const topB = getTopTwo(getGroupStandings(t, 'B'));
-    if (topA.length >= 2 && topB.length >= 2) {
-      const semis = t.semifinals;
-      const fin = t.final;
-      const s1p1 = topA[0]||"TBD", s1p2 = topB[1]||"TBD";
-      const s2p1 = topB[0]||"TBD", s2p2 = topA[1]||"TBD";
-      const s1 = semis?.semi1, s2 = semis?.semi2;
+    // Knockout stage — only show real names once semifinals are officially set
+    const semis = t.semifinals;
+    const fin = t.final;
+    const hasSemis = semis?.semi1?.p1 && semis?.semi2?.p1;
 
-      html += `</div><div class="rr-knockout">`;
-      html += `<div class="rr-knockout-title">🏆 Knockout Stage</div>`;
-      html += `<div class="semi-grid">`;
+    html += `</div><div class="rr-knockout">`;
+    html += `<div class="rr-knockout-title">🏆 Knockout Stage</div>`;
+    html += `<div class="semi-grid">`;
 
-      // Semi 1
-      html += `<div class="semi-card">
-        <div class="semi-label">Semifinal 1 — A1 vs B2</div>
-        <div class="semi-matchup">${s1p1} vs ${s1p2}</div>
-        ${s1?.winner ? `<div class="semi-result">✅ ${s1.winner} advances</div>` : (isAdmin && t.status==="active" ? `<button class="btn-secondary btn-xs" style="margin-top:8px" onclick="window._rrEnterKnockoutScore('${t.id}','semifinal','semi1','${s1p1}','${s1p2}')">Enter Score</button>` : "")}
-      </div>`;
+    const s1p1 = hasSemis ? semis.semi1.p1 : "TBD";
+    const s1p2 = hasSemis ? semis.semi1.p2 : "TBD";
+    const s2p1 = hasSemis ? semis.semi2.p1 : "TBD";
+    const s2p2 = hasSemis ? semis.semi2.p2 : "TBD";
+    const s1 = semis?.semi1, s2 = semis?.semi2;
 
-      // Semi 2
-      html += `<div class="semi-card">
-        <div class="semi-label">Semifinal 2 — B1 vs A2</div>
-        <div class="semi-matchup">${s2p1} vs ${s2p2}</div>
-        ${s2?.winner ? `<div class="semi-result">✅ ${s2.winner} advances</div>` : (isAdmin && t.status==="active" ? `<button class="btn-secondary btn-xs" style="margin-top:8px" onclick="window._rrEnterKnockoutScore('${t.id}','semifinal','semi2','${s2p1}','${s2p2}')">Enter Score</button>` : "")}
-      </div>`;
-      html += `</div>`;
+    // Semi 1
+    html += `<div class="semi-card">
+      <div class="semi-label">Semifinal 1 — A1 vs B2</div>
+      <div class="semi-matchup">${s1p1} vs ${s1p2}</div>
+      ${s1?.winner ? `<div class="semi-result">✅ ${s1.winner} advances</div>` : (isAdmin && hasSemis && t.status==="active" ? `<button class="btn-secondary btn-xs" style="margin-top:8px" onclick="window._rrEnterKnockoutScore('${t.id}','semifinal','semi1','${s1p1}','${s1p2}')">Enter Score</button>` : "")}
+    </div>`;
 
-      // Final
-      if (s1?.winner && s2?.winner) {
-        const fp1 = fin?.p1||s1.winner, fp2 = fin?.p2||s2.winner;
-        html += `<div class="final-card">`;
-        html += `<div class="final-label">Final</div>`;
-        if (t.champion) {
-          html += `<div class="final-champion">${t.champion}</div>`;
-          html += `<div class="final-champ-label">${t.division} Champion</div>`;
-        } else {
-          html += `<div class="final-matchup">${fp1} vs ${fp2}</div>`;
-          if (isAdmin) html += `<button class="btn-sm" style="background:rgba(201,168,76,0.2);border-color:rgba(201,168,76,0.4);color:var(--gold);margin-top:10px" onclick="window._rrEnterKnockoutScore('${t.id}','final','final','${fp1}','${fp2}')">Enter Final Score</button>`;
-        }
-        html += `</div>`;
+    // Semi 2
+    html += `<div class="semi-card">
+      <div class="semi-label">Semifinal 2 — B1 vs A2</div>
+      <div class="semi-matchup">${s2p1} vs ${s2p2}</div>
+      ${s2?.winner ? `<div class="semi-result">✅ ${s2.winner} advances</div>` : (isAdmin && hasSemis && t.status==="active" ? `<button class="btn-secondary btn-xs" style="margin-top:8px" onclick="window._rrEnterKnockoutScore('${t.id}','semifinal','semi2','${s2p1}','${s2p2}')">Enter Score</button>` : "")}
+    </div>`;
+    html += `</div>`;
+
+    // Final
+    if (s1?.winner && s2?.winner) {
+      const fp1 = fin?.p1||s1.winner, fp2 = fin?.p2||s2.winner;
+      html += `<div class="final-card">`;
+      html += `<div class="final-label">Final</div>`;
+      if (t.champion) {
+        html += `<div class="final-champion">${t.champion}</div>`;
+        html += `<div class="final-champ-label">${t.division} Champion</div>`;
+      } else {
+        html += `<div class="final-matchup">${fp1} vs ${fp2}</div>`;
+        if (isAdmin) html += `<button class="btn-sm" style="background:rgba(201,168,76,0.2);border-color:rgba(201,168,76,0.4);color:var(--gold);margin-top:10px" onclick="window._rrEnterKnockoutScore('${t.id}','final','final','${fp1}','${fp2}')">Enter Final Score</button>`;
       }
-    } else {
-      html += `</div>`; // close rr-body
+      html += `</div>`;
+    } else if (!hasSemis) {
+      html += `<div class="final-card">`;
+      html += `<div class="final-label">Final</div>`;
+      html += `<div class="final-matchup">TBD vs TBD</div>`;
+      html += `</div>`;
     }
 
+    html += `</div>`; // close rr-knockout
     html += `</div>`; // rr-card
   });
 
