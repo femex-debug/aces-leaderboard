@@ -728,3 +728,30 @@ input::placeholder { color: var(--muted-2); }
   font-family: 'Inter', sans-serif; margin-right: 4px;
 }
 .vs-sep { color: var(--muted); font-weight: 400; margin: 0 4px; font-size: 11px; }
+
+/* ─── SCHEDULE SPLIT LAYOUT ─── */
+.schedule-split { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 640px) { .schedule-split { grid-template-columns: 1fr; } }
+
+/* ─── CLICKABLE PLAYER NAMES ─── */
+.player-link { cursor: pointer; transition: color 0.15s; }
+.player-link:hover { color: var(--green); text-decoration: underline; }
+
+/* ─── STICKY SCHEDULE DIVISION HEADERS (mobile) ─── */
+@media (max-width: 640px) {
+  .schedule-split .rr-group-title {
+    position: sticky; top: 52px; z-index: 10;
+    background: var(--bg); padding: 8px 0; margin-bottom: 8px;
+    border-bottom: 2px solid var(--gold-pale);
+  }
+}
+
+/* ─── WHATSAPP SHARE ─── */
+.wa-share {
+  display: inline-block; margin-left: 8px;
+  font-size: 10px; font-weight: 600; color: #25D366;
+  text-decoration: none; padding: 2px 8px;
+  border: 1px solid rgba(37,211,102,0.3); border-radius: 10px;
+  transition: all 0.15s;
+}
+.wa-share:hover { background: rgba(37,211,102,0.1); border-color: #25D366; }

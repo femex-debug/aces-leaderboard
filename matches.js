@@ -177,10 +177,11 @@ function renderRecent() {
     const date = m.date ? new Date(m.date).toLocaleDateString() : "";
     const tag = m.matchType === "doubles" ? " Doubles" : "";
     const rt = m.resultType && m.resultType !== "completed" ? ` (${m.resultType.toUpperCase()})` : "";
+    const shareText = encodeURIComponent(`ACES Club: ${getWinnerName(m)} def. ${getLoserName(m)} ${formatSets(m.sets)}`);
     return `<li>
       <div><span class="match-players"><span class="winner-badge">W ${getWinnerName(m)}</span> def. ${getLoserName(m)}${rt}</span></div>
       <span class="match-score">${formatSets(m.sets)}</span>
-      <div class="match-meta">${date}${tag}</div>
+      <div class="match-meta">${date}${tag} <a href="https://wa.me/?text=${shareText}" target="_blank" class="wa-share" title="Share on WhatsApp">Share</a></div>
     </li>`;
   }).join("");
 }
@@ -238,5 +239,18 @@ function initH2H() {
     result.innerHTML = html + "</div>";
   });
 }
+
+// Navigate to H2H tab with player pre-filled
+window._goH2H = (name) => {
+  document.getElementById("h2h-a").value = name;
+  document.getElementById("h2h-b").value = "";
+  document.getElementById("h2h-result").innerHTML = "<p>Select a second player to compare.</p>";
+  // Switch to H2H tab
+  document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+  document.querySelector('[data-tab="h2h"]').classList.add("active");
+  document.getElementById("h2h").classList.add("active");
+  document.getElementById("h2h-b").focus();
+};
 
 export { allMatches, formatSets, determineWinner };

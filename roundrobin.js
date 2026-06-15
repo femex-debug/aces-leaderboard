@@ -6,8 +6,52 @@ import { getPlayers } from "./players.js";
 
 const RR_START = "2026-06-15";
 let rrTournaments = {}; // { id: data }
+
+// ── Score Modal Helper ──
+function showScoreModal(p1, p2, onSubmit) {
+  const modal = document.getElementById("score-modal");
+  const title = document.getElementById("score-modal-title");
+  const sub = document.getElementById("score-modal-sub");
+  const inp1 = document.getElementById("score-modal-p1");
+  const inp2 = document.getElementById("score-modal-p2");
+  const msg = document.getElementById("score-modal-msg");
+
+  title.textContent = `${p1} vs ${p2}`;
+  sub.textContent = `Enter sets won by each player`;
+  inp1.value = ""; inp2.value = ""; msg.textContent = "";
+  inp1.placeholder = p1; inp2.placeholder = p2;
+  modal.classList.remove("hidden");
+  inp1.focus();
+
+  const submitBtn = document.getElementById("score-modal-submit");
+  const cancelBtn = document.getElementById("score-modal-cancel");
+
+  function cleanup() {
+    modal.classList.add("hidden");
+    submitBtn.replaceWith(submitBtn.cloneNode(true));
+    cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+  }
+
+  document.getElementById("score-modal-submit").addEventListener("click", () => {
+    const s1 = parseInt(inp1.value), s2 = parseInt(inp2.value);
+    if (isNaN(s1) || isNaN(s2) || s1 === s2 || s1 < 0 || s2 < 0) {
+      msg.textContent = "Enter valid scores (can't be equal)"; msg.className = "form-msg msg-err"; return;
+    }
+    cleanup();
+    onSubmit(s1, s2);
+  });
+  document.getElementById("score-modal-cancel").addEventListener("click", cleanup);
+}
+
 // Admin state read directly from admin.js — no local copy needed
 export function setRRAdminMode(val) { renderRRPage(); } // kept for app.js compatibility
+
+// ── Week Deadline Calculator ──
+function getWeekDeadline(startDate, weekIndex) {
+  const start = new Date(startDate);
+  const deadline = new Date(start.getTime() + (weekIndex + 1) * 7 * 24 * 60 * 60 * 1000);
+  return deadline.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 export function initRoundRobin() {
   // Listen to rr_tournaments collection
@@ -220,33 +264,23 @@ export async function addPlayerToRoundRobin(playerName, division) {
 }
 
 
-window._rrEnterScore = async (rrId, group, p1, p2) => {
-  const score = prompt(`Enter score for ${p1} vs ${p2}\nFormat: sets won by ${p1} - sets won by ${p2}\nExample: 2-1`);
-  if (!score) return;
-  const parts = score.split("-").map(s => parseInt(s.trim()));
-  if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1]) || parts[0] === parts[1]) {
-    alert("Invalid score. Enter format like 2-1 or 1-0"); return;
-  }
+window._rrEnterScore = (rrId, group, p1, p2) => {
+  showScoreModal(p1, p2, async (p1Sets, p2Sets) => {
+    const t = rrTournaments[rrId];
+    if (!t) return;
 
-  const t = rrTournaments[rrId];
-  if (!t) return;
+    const winner = p1Sets > p2Sets ? p1 : p2;
 
-  const p1Sets = parts[0], p2Sets = parts[1];
-  const winner = p1Sets > p2Sets ? p1 : p2;
-  const loser  = winner === p1 ? p2 : p1;
-
-  // Update standings
-  // Update flat standings
-  const st = JSON.parse(JSON.stringify(t.standings || {}));
-  const k1 = `${group}_${p1.replace(/[.#$\[\]/]/g,"_")}`;
-  const k2 = `${group}_${p2.replace(/[.#$\[\]/]/g,"_")}`;
-  if (!st[k1]) st[k1] = { name: p1, group, played:0, setWins:0, setLosses:0, matchWins:0 };
-  if (!st[k2]) st[k2] = { name: p2, group, played:0, setWins:0, setLosses:0, matchWins:0 };
-  st[k1].played++;  st[k2].played++;
-  st[k1].setWins   += p1Sets; st[k1].setLosses += p2Sets;
-  st[k2].setWins   += p2Sets; st[k2].setLosses += p1Sets;
-  if (p1Sets > p2Sets) st[k1].matchWins++;
-  else st[k2].matchWins++;
+    const st = JSON.parse(JSON.stringify(t.standings || {}));
+    const k1 = `${group}_${p1.replace(/[.#$\[\]/]/g,"_")}`;
+    const k2 = `${group}_${p2.replace(/[.#$\[\]/]/g,"_")}`;
+    if (!st[k1]) st[k1] = { name: p1, group, played:0, setWins:0, setLosses:0, matchWins:0 };
+    if (!st[k2]) st[k2] = { name: p2, group, played:0, setWins:0, setLosses:0, matchWins:0 };
+    st[k1].played++;  st[k2].played++;
+    st[k1].setWins += p1Sets; st[k1].setLosses += p2Sets;
+    st[k2].setWins += p2Sets; st[k2].setLosses += p1Sets;
+    if (p1Sets > p2Sets) st[k1].matchWins++;
+    else st[k2].matchWins++;
 
   const matchRecord = {
     group, p1, p2, p1Sets, p2Sets, winner,
@@ -290,6 +324,7 @@ window._rrEnterScore = async (rrId, group, p1, p2) => {
     alert("Error saving score: " + err.message);
     console.error(err);
   }
+  });
 };
 
 // Called from pending.js when approving an RR match — updates standings only (match already written)
@@ -330,24 +365,24 @@ window._rrEnterScoreFromApproval = async (rrId, group, p1, p2, p1Sets, p2Sets) =
 };
 
 // Player submits RR score — goes to pending for admin approval
-window._rrSubmitScore = async (rrId, group, p1, p2) => {
-  const score = prompt(`Enter score for ${p1} vs ${p2}\nFormat: sets won, e.g. 2-1 or 6-3, 6-4`);
-  if (!score || !score.trim()) return;
-  try {
-    await addDoc(collection(db, "pending_matches"), {
-      player1: p1,
-      player2: p2,
-      score: score.trim(),
-      source: "roundrobin",
-      rrId,
-      rrGroup: group,
-      submittedAt: new Date().toISOString(),
-      status: "pending"
-    });
-    alert("Score submitted! Awaiting admin approval.");
-  } catch (err) {
-    alert("Error submitting: " + err.message);
-  }
+window._rrSubmitScore = (rrId, group, p1, p2) => {
+  showScoreModal(p1, p2, async (p1Sets, p2Sets) => {
+    try {
+      await addDoc(collection(db, "pending_matches"), {
+        player1: p1,
+        player2: p2,
+        score: `${p1Sets}-${p2Sets}`,
+        source: "roundrobin",
+        rrId,
+        rrGroup: group,
+        submittedAt: new Date().toISOString(),
+        status: "pending"
+      });
+      alert("Score submitted! Awaiting admin approval.");
+    } catch (err) {
+      alert("Error submitting: " + err.message);
+    }
+  });
 };
 
 
@@ -548,12 +583,10 @@ export function renderRRPage() {
   const isAdmin = getIsAdmin();
 
   // Also update RR matchups in the Schedule tab
-  const rrSchedEl = document.getElementById("rr-schedule-section");
-  if (rrSchedEl) {
-    const activeTab = document.querySelector(".sched-div-tab.active");
-    const filter = activeTab ? activeTab.dataset.sdiv : "all";
-    rrSchedEl.innerHTML = renderRRSchedule(filter);
-  }
+  const rrExp = document.getElementById("rr-schedule-experienced");
+  const rrBeg = document.getElementById("rr-schedule-beginner");
+  if (rrExp) rrExp.innerHTML = renderRRSchedule("experienced");
+  if (rrBeg) rrBeg.innerHTML = renderRRSchedule("beginner");
 
   let html = "";
 
@@ -750,7 +783,7 @@ export function renderRRSchedule(divFilter) {
 
       html += `<div class="rr-group-title" style="margin-top:12px">Group ${grp}</div>`;
       weekly.forEach((weekMatches, wi) => {
-        html += `<div class="rr-week-label">Week ${wi+1}</div>`;
+        html += `<div class="rr-week-label">Week ${wi+1} <span style="color:var(--muted);font-weight:400">— due ${getWeekDeadline(t.startDate || RR_START, wi)}</span></div>`;
         weekMatches.forEach(matchup => {
           const mp1 = matchup.p1 || "";
           const mp2 = matchup.p2 || "";

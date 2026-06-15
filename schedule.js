@@ -7,11 +7,8 @@ let scheduled = [];
 
 export function initSchedule() {
   const ref = collection(db, "scheduled");
-  // No orderBy on the query — avoids Firestore index requirements
-  // Sort in JavaScript instead so any missing dateTime fields don't break the listener
   onSnapshot(ref, snap => {
     scheduled = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    // Sort by dateTime in JS — handles missing fields gracefully
     scheduled.sort((a, b) => {
       const da = a.dateTime || "9999";
       const db2 = b.dateTime || "9999";
@@ -55,36 +52,44 @@ export function initSchedule() {
 }
 
 function renderScheduleList() {
-  const list = document.getElementById("schedule-list");
   const upcoming = scheduled.filter(s => s.status === "upcoming");
-  if (!upcoming.length) { list.innerHTML = "<li>No upcoming matches.</li>"; return; }
+  const expList = document.getElementById("schedule-list-experienced");
+  const begList = document.getElementById("schedule-list-beginner");
 
-  list.innerHTML = upcoming.map(s => {
-    const dt = new Date(s.dateTime);
-    const dateStr = dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-    const timeStr = dt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-    const players = s.matchType === "doubles"
-      ? `${s.team1a} & ${s.team1b} vs ${s.team2a} & ${s.team2b}`
-      : `${s.player1} vs ${s.player2}`;
-    const tag = s.matchType === "doubles" ? " Doubles" : "";
-    const court = s.court ? ` • ${s.court}` : "";
-    const tournamentBadge = s.source === "tournament"
-      ? `<span style="background:#0F2D18;color:#C9A84C;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;margin-left:6px">${s.tournamentName || "Tournament"} • ${s.round || "Round 1"}</span>`
-      : "";
-    const cancelBtn = getIsAdmin() ? `<button class="btn-sm" onclick="window._cancelMatch('${s.id}')">Cancel</button>` : "";
-    const submitScoreBtn = !getIsAdmin() && s.source !== "tournament"
-      ? `<button class="btn-secondary btn-xs" onclick="window._submitScheduledScore('${s.id}','${(s.player1||"").replace(/'/g,"\\'")}','${(s.player2||"").replace(/'/g,"\\'")}')">Submit Score</button>`
-      : "";
-    return `<li>
-      <div><b>${players}</b>${tag}${tournamentBadge}</div>
-      <div class="match-meta">${dateStr} at ${timeStr}${court}</div>
-      <div style="display:flex;gap:6px">${cancelBtn}${submitScoreBtn}</div>
-    </li>`;
-  }).join("");
+  const expMatches = upcoming.filter(s => (s.division || "").toLowerCase() === "experienced");
+  const begMatches = upcoming.filter(s => (s.division || "").toLowerCase() === "beginner");
 
-  // Append round robin weekly matchups
-  const rrEl = document.getElementById("rr-schedule-section");
-  if (rrEl) rrEl.innerHTML = renderRRSchedule();
+  expList.innerHTML = expMatches.length ? expMatches.map(renderMatchItem).join("") : "<li>No matches</li>";
+  begList.innerHTML = begMatches.length ? begMatches.map(renderMatchItem).join("") : "<li>No matches</li>";
+
+  // RR matchups split by division
+  const rrExp = document.getElementById("rr-schedule-experienced");
+  const rrBeg = document.getElementById("rr-schedule-beginner");
+  if (rrExp) rrExp.innerHTML = renderRRSchedule("experienced");
+  if (rrBeg) rrBeg.innerHTML = renderRRSchedule("beginner");
+}
+
+function renderMatchItem(s) {
+  const dt = new Date(s.dateTime);
+  const dateStr = dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  const timeStr = dt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  const players = s.matchType === "doubles"
+    ? `${s.team1a} & ${s.team1b} vs ${s.team2a} & ${s.team2b}`
+    : `${s.player1} vs ${s.player2}`;
+  const tag = s.matchType === "doubles" ? " Doubles" : "";
+  const court = s.court ? ` • ${s.court}` : "";
+  const tournamentBadge = s.source === "tournament"
+    ? `<span style="background:#0F2D18;color:#C9A84C;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;margin-left:6px">${s.tournamentName || "Tournament"} • ${s.round || "Round 1"}</span>`
+    : "";
+  const cancelBtn = getIsAdmin() ? `<button class="btn-sm" onclick="window._cancelMatch('${s.id}')">Cancel</button>` : "";
+  const submitScoreBtn = !getIsAdmin() && s.source !== "tournament"
+    ? `<button class="btn-secondary btn-xs" onclick="window._submitScheduledScore('${s.id}','${(s.player1||"").replace(/'/g,"\\'")}','${(s.player2||"").replace(/'/g,"\\'")}')">Submit Score</button>`
+    : "";
+  return `<li>
+    <div><b>${players}</b>${tag}${tournamentBadge}</div>
+    <div class="match-meta">${dateStr} at ${timeStr}${court}</div>
+    <div style="display:flex;gap:6px">${cancelBtn}${submitScoreBtn}</div>
+  </li>`;
 }
 
 window._cancelMatch = async (id) => {

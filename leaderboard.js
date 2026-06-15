@@ -140,7 +140,7 @@ export function renderLeaderboard() {
       <td class="col-rank">${rankLabel(rank)}</td>
       <td class="col-name">
         <div class="player-cell">
-          <span class="player-full-name">${p.name}</span>
+          <span class="player-full-name player-link" onclick="window._goH2H('${p.name.replace(/'/g, "\\'")}')">${p.name}</span>
           ${divisionLabel(p.division)}
         </div>
       </td>
@@ -160,7 +160,18 @@ export function renderLeaderboard() {
 }
 
 export function initLeaderboard() {
-  // skill-tab filtering handled in app.js
+  document.getElementById("share-standings").addEventListener("click", (e) => {
+    e.preventDefault();
+    const rows = document.querySelectorAll("#leaderboard-table tbody tr");
+    let text = "ACES Club Standings:\n";
+    rows.forEach((tr, i) => {
+      const name = tr.querySelector(".player-full-name")?.textContent || "";
+      const w = tr.querySelector(".col-w")?.textContent || "0";
+      const l = tr.querySelector(".col-l")?.textContent || "0";
+      if (name) text += `${i+1}. ${name} (${w}W-${l}L)\n`;
+    });
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  });
 }
 
 // ── Weekly MVP ──
