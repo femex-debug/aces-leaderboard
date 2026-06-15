@@ -6,16 +6,16 @@ import { initMatches } from "./matches.js";
 import { initSchedule } from "./schedule.js";
 import { initTournament } from "./tournament.js";
 import { initRoundRobin, renderRRPage, addPlayerToRoundRobin, setRRAdminMode } from "./roundrobin.js";
-import { initPending, updatePublicDropdowns, onPlayerApproved } from "./pending.js";
+import { initPending, updatePublicDropdowns, onPlayerApproved, refreshPendingUI } from "./pending.js";
 
 // Main tabs
 document.querySelectorAll(".tab").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".panel").forEach(p => { p.classList.remove("active"); p.style.display = "none"; });
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
     btn.classList.add("active");
     const panel = document.getElementById(btn.dataset.tab);
-    if (panel) { panel.classList.add("active"); panel.style.display = "block"; }
+    if (panel) panel.classList.add("active");
     if (btn.dataset.tab === "admin-panel") renderSkillAssignment();
     if (btn.dataset.tab === "roundrobin") renderRRPage();
   });
@@ -42,7 +42,10 @@ initRoundRobin();
 initPending();
 
 // Wire admin login/logout to round robin admin mode
-onAdminChange((isAdmin) => setRRAdminMode(isAdmin));
+onAdminChange((isAdmin) => {
+  setRRAdminMode(isAdmin);
+  refreshPendingUI();
+});
 
 // Wire player additions to round robin auto-enrollment
 onPlayerSkillSet((name, division) => addPlayerToRoundRobin(name, division));

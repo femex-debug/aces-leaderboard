@@ -36,7 +36,7 @@ function renderRoster() {
   const el = document.getElementById("player-roster");
   el.innerHTML = playersList.map(p =>
     `<div class="roster-item">
-      <span>${p.name} <span class="division-badge badge-${p.division}">${p.division.toUpperCase()}</span></span>
+      <span>${p.name} <span class="div-pill div-${p.division}">${(p.division||"").toUpperCase()}</span></span>
       <button class="btn-danger btn-sm" onclick="window._removePlayer('${p.id}')">Remove</button>
     </div>`
   ).join("");

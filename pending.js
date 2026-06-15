@@ -17,16 +17,28 @@ export function initPending() {
   onSnapshot(collection(db, "pending_matches"), snap => {
     pendingMatches = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderPendingQueue();
+    updatePendingBadge();
   });
 
   onSnapshot(collection(db, "pending_players"), snap => {
     pendingPlayers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderPendingQueue();
-    renderPendingPlayersList();
+    updatePendingBadge();
   });
 
   initPublicMatchForm();
   initPublicPlayerForm();
+}
+
+// Re-render when admin state changes
+export function refreshPendingUI() {
+  renderPendingQueue();
+  updatePendingBadge();
+}
+
+function updatePendingBadge() {
+  const el = document.getElementById("pending-count");
+  if (el) el.textContent = pendingMatches.length + pendingPlayers.length;
 }
 
 // ── PUBLIC SCORE SUBMISSION FORM ──

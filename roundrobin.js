@@ -84,47 +84,6 @@ function buildWeeklyAssignments(rounds) {
   return weeks;
 }
 
-// Generate matchups for a NEW player joining mid-tournament
-// Only generates matches for remaining weeks (weeks not yet completed)
-function generateRemainingMatchups(newPlayer, existingPlayers, completedWeekCount) {
-  // New player plays everyone in the group twice (once each direction)
-  const allMatchups = [];
-  existingPlayers.forEach(p => {
-    allMatchups.push({p1: newPlayer, p2: p});
-    allMatchups.push({p1: p, p2: newPlayer});
-  });
-
-  // Pack into weeks of 2 matches per player
-  const weeks = [];
-  let idx = 0;
-  while (idx < allMatchups.length) {
-    // Find matches where new player isn't double-booked in same week
-    const week = [];
-    const seenThisWeek = new Set();
-    const tempRemaining = [];
-    for (let i = idx; i < allMatchups.length; i++) {
-      const {p1, p2} = allMatchups[i];
-      if (!seenThisWeek.has(p1) && !seenThisWeek.has(p2) && week.length < 2) {
-        week.push({p1, p2});
-        seenThisWeek.add(p1);
-        seenThisWeek.add(p2);
-      } else {
-        tempRemaining.push(allMatchups[i]);
-      }
-    }
-    if (week.length) weeks.push(week);
-    else break;
-    idx = allMatchups.length - tempRemaining.length;
-    allMatchups.splice(0, allMatchups.length, ...tempRemaining);
-    idx = 0;
-    if (!allMatchups.length) break;
-  }
-
-  // Pad with empty weeks to align with completed weeks so new matchups start at the right week
-  const padded = Array.from({ length: completedWeekCount }, () => []);
-  return [...padded, ...weeks];
-}
-
 // ── CREATE ROUND ROBIN ──
 async function createRoundRobin(division) {
   const players = getPlayers();
@@ -212,28 +171,26 @@ export async function addPlayerToRoundRobin(playerName, division) {
   const grp = grpA.length <= grpB.length ? "A" : "B";
   const existingPlayers = grp === "A" ? grpA : grpB;
 
-  // Work out which week we are at
-  const weekCount = t.schedule?.[`${grp}_weekCount`] || 0;
-  const doneWeeks = weekCount; // new player starts from next week
+  // Append new weeks starting after existing schedule
+  const existingWeekCount = t.schedule?.[`${grp}_weekCount`] || 0;
 
-  // Generate remaining matchups as flat schedule entries
   const newSchedule = { ...t.schedule };
-  let startWeek = doneWeeks;
-  // Each existing player gets 2 matches against the new player (one each direction)
+
+  // New player plays everyone in the group twice (home + away)
   const matchups = [];
   existingPlayers.forEach(p => {
     matchups.push({ p1: playerName, p2: p });
     matchups.push({ p1: p, p2: playerName });
   });
-  // Pack into weeks of 2
-  let wi = startWeek;
-  let idx = 0;
-  while (idx < matchups.length) {
-    let mi = 0;
-    for (let r = 0; r < 2 && idx < matchups.length; r++, idx++, mi++) {
-      newSchedule[`${grp}_w${wi}_m${mi}`] = matchups[idx];
-    }
-    newSchedule[`${grp}_w${wi}_count`] = mi;
+
+  // Pack into weeks of 2 matches each
+  let wi = existingWeekCount;
+  for (let idx = 0; idx < matchups.length; idx += 2) {
+    const weekMatches = matchups.slice(idx, idx + 2);
+    weekMatches.forEach((m, mi) => {
+      newSchedule[`${grp}_w${wi}_m${mi}`] = m;
+    });
+    newSchedule[`${grp}_w${wi}_count`] = weekMatches.length;
     wi++;
   }
   newSchedule[`${grp}_weekCount`] = wi;
@@ -336,27 +293,38 @@ window._rrEnterScore = async (rrId, group, p1, p2) => {
 
 
 
-function checkAdvancement(t, standings, matches) {
-  const topA = getTopTwo(standings.A);
-  const topB = getTopTwo(standings.B);
+function checkAdvancement(t, standings, matchLog) {
+  const grpAStand = {};
+  const grpBStand = {};
+  Object.entries(standings).forEach(([key, val]) => {
+    if (val && val.group === "A" && val.name) grpAStand[val.name] = val;
+    if (val && val.group === "B" && val.name) grpBStand[val.name] = val;
+  });
 
-  // Only advance if all players have played enough matches
-  const totalA = t.groups.A.players.length;
-  const totalB = t.groups.B.players.length;
-  const minMatchesA = Math.min(...Object.values(standings.A).map(s => s.played));
-  const minMatchesB = Math.min(...Object.values(standings.B).map(s => s.played));
+  const topA = getTopTwo(grpAStand);
+  const topB = getTopTwo(grpBStand);
 
-  let semis = t.semifinals;
-  let final = t.final;
-  let champion = "";
+  // Only advance if we have 2 from each group with at least 1 match played
+  const aReady = topA.length >= 2 && Object.values(grpAStand).every(s => s.played > 0);
+  const bReady = topB.length >= 2 && Object.values(grpBStand).every(s => s.played > 0);
 
-  // Auto-set semis when both groups have completed round robin
-  // Semi: A1 vs B2, B1 vs A2
-  const semiMatch1 = matches.find(m => m.isSemiFinal && m.matchId === "semi1");
-  const semiMatch2 = matches.find(m => m.isSemiFinal && m.matchId === "semi2");
-  const finalMatch = matches.find(m => m.isFinal);
+  let semis = t.semifinals || {};
+  let final = t.final || {};
+  let champion = t.champion || "";
 
-  if (finalMatch && finalMatch.winner) champion = finalMatch.winner;
+  if (aReady && bReady && !semis.semi1?.p1) {
+    // Set up semifinals: A1 vs B2, B1 vs A2
+    semis = {
+      semi1: { p1: topA[0], p2: topB[1], winner: null },
+      semi2: { p1: topB[0], p2: topA[1], winner: null }
+    };
+  }
+
+  if (semis.semi1?.winner && semis.semi2?.winner && !final.p1) {
+    final = { p1: semis.semi1.winner, p2: semis.semi2.winner, winner: null };
+  }
+
+  if (final.winner) champion = final.winner;
 
   return { semis, final, champion };
 }
@@ -374,13 +342,13 @@ window._rrEnterKnockoutScore = async (rrId, stage, matchId, p1, p2) => {
   const t = rrTournaments[rrId];
   if (!t) return;
 
-  const updatedMatches = [...(t.matches || []), {
+  const matchKey = `knockout_${matchId}_${Date.now()}`;
+  const updatedMatchLog = { ...(t.matchLog || {}), [matchKey]: {
     group: "knockout", p1, p2,
     p1Sets: parts[0], p2Sets: parts[1],
-    winner, isSemiFinal: stage === "semifinal",
-    isFinal: stage === "final", matchId,
+    winner, stage, matchId,
     date: new Date().toISOString()
-  }];
+  }};
 
   let champion = t.champion || "";
   if (stage === "final") champion = winner;
@@ -390,11 +358,10 @@ window._rrEnterKnockoutScore = async (rrId, stage, matchId, p1, p2) => {
     semi1: { p1: null, p2: null, winner: null },
     semi2: { p1: null, p2: null, winner: null }
   };
-  const finalState = t.final || { p1: null, p2: null, winner: null };
+  const finalState = t.final ? JSON.parse(JSON.stringify(t.final)) : { p1: null, p2: null, winner: null };
 
   if (stage === "semifinal") {
     semis[matchId] = { p1, p2, winner };
-    // If both semis done, set final players
     if (semis.semi1.winner && semis.semi2.winner) {
       finalState.p1 = semis.semi1.winner;
       finalState.p2 = semis.semi2.winner;
@@ -406,7 +373,7 @@ window._rrEnterKnockoutScore = async (rrId, stage, matchId, p1, p2) => {
 
   try {
     await setDoc(doc(db, "rr_tournaments", rrId), {
-      matches: updatedMatches,
+      matchLog: updatedMatchLog,
       semifinals: semis,
       final: finalState,
       champion,
@@ -534,10 +501,13 @@ export function renderRRPage() {
   const tournaments = Object.values(rrTournaments).sort((a,b) => (b.createdAt||"").localeCompare(a.createdAt||""));
 
   if (!tournaments.length) {
-    document.getElementById("rr-empty") && document.getElementById("rr-empty").classList.remove("hidden");
+    const emptyEl = document.getElementById("rr-empty");
+    if (emptyEl) emptyEl.classList.remove("hidden");
     container.innerHTML = html;
     return;
   }
+  const emptyEl = document.getElementById("rr-empty");
+  if (emptyEl) emptyEl.classList.add("hidden");
 
   tournaments.forEach(t => {
     const statusBadge = t.status === "completed"
