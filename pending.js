@@ -212,18 +212,30 @@ window._approveMatch = async (id) => {
   const winner = p1Sets >= p2Sets ? 1 : 2;
 
   try {
-    await addDoc(collection(db, "matches"), {
+    const matchData = {
       matchType: "singles",
       player1: m.player1,
       player2: m.player2,
       winner,
       sets,
       resultType: "completed",
-      source: "player_submission",
+      source: m.source || "player_submission",
       date: new Date().toISOString(),
       timestamp: Date.now(),
       season: getCurrentSeason()
-    });
+    };
+    // Include RR metadata if it's a round robin score
+    if (m.source === "roundrobin" && m.rrId) {
+      matchData.rrId = m.rrId;
+      matchData.rrGroup = m.rrGroup;
+    }
+    await addDoc(collection(db, "matches"), matchData);
+
+    // If RR match, update RR standings
+    if (m.source === "roundrobin" && m.rrId) {
+      window._rrEnterScoreFromApproval && window._rrEnterScoreFromApproval(m.rrId, m.rrGroup, m.player1, m.player2, p1Sets, p2Sets);
+    }
+
     await deleteDoc(doc(db, "pending_matches", id));
   } catch (err) {
     alert("Error approving: " + err.message);

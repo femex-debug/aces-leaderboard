@@ -292,6 +292,43 @@ window._rrEnterScore = async (rrId, group, p1, p2) => {
   }
 };
 
+// Called from pending.js when approving an RR match — updates standings only (match already written)
+window._rrEnterScoreFromApproval = async (rrId, group, p1, p2, p1Sets, p2Sets) => {
+  const t = rrTournaments[rrId];
+  if (!t) return;
+
+  const winner = p1Sets > p2Sets ? p1 : p2;
+  const st = JSON.parse(JSON.stringify(t.standings || {}));
+  const k1 = `${group}_${p1.replace(/[.#$\[\]/]/g,"_")}`;
+  const k2 = `${group}_${p2.replace(/[.#$\[\]/]/g,"_")}`;
+  if (!st[k1]) st[k1] = { name: p1, group, played:0, setWins:0, setLosses:0, matchWins:0 };
+  if (!st[k2]) st[k2] = { name: p2, group, played:0, setWins:0, setLosses:0, matchWins:0 };
+  st[k1].played++; st[k2].played++;
+  st[k1].setWins += p1Sets; st[k1].setLosses += p2Sets;
+  st[k2].setWins += p2Sets; st[k2].setLosses += p1Sets;
+  if (p1Sets > p2Sets) st[k1].matchWins++; else st[k2].matchWins++;
+
+  const matchKey = `match_${Date.now()}`;
+  const updatedMatchLog = { ...(t.matchLog || {}), [matchKey]: {
+    group, p1, p2, p1Sets, p2Sets, winner, date: new Date().toISOString()
+  }};
+
+  const { semis, final, champion } = checkAdvancement(t, st, updatedMatchLog);
+
+  try {
+    await setDoc(doc(db, "rr_tournaments", rrId), {
+      standings: st,
+      matchLog: updatedMatchLog,
+      semifinals: semis || t.semifinals,
+      final: final || t.final,
+      champion: champion || t.champion || "",
+      status: champion ? "completed" : t.status
+    }, { merge: true });
+  } catch (err) {
+    console.error("RR standings update error:", err);
+  }
+};
+
 // Player submits RR score — goes to pending for admin approval
 window._rrSubmitScore = async (rrId, group, p1, p2) => {
   const score = prompt(`Enter score for ${p1} vs ${p2}\nFormat: sets won, e.g. 2-1 or 6-3, 6-4`);
@@ -512,7 +549,11 @@ export function renderRRPage() {
 
   // Also update RR matchups in the Schedule tab
   const rrSchedEl = document.getElementById("rr-schedule-section");
-  if (rrSchedEl) rrSchedEl.innerHTML = renderRRSchedule();
+  if (rrSchedEl) {
+    const activeTab = document.querySelector(".sched-div-tab.active");
+    const filter = activeTab ? activeTab.dataset.sdiv : "all";
+    rrSchedEl.innerHTML = renderRRSchedule(filter);
+  }
 
   let html = "";
 
@@ -688,9 +729,12 @@ export function renderRRPage() {
 window._rrCreate = (division) => createRoundRobin(division);
 
 // ── RR SCHEDULE for the Schedule tab ──
-export function renderRRSchedule() {
+export function renderRRSchedule(divFilter) {
   const isAdmin = getIsAdmin();
-  const tournaments = Object.values(rrTournaments).filter(t => t.status === "active");
+  let tournaments = Object.values(rrTournaments).filter(t => t.status === "active");
+  if (divFilter && divFilter !== "all") {
+    tournaments = tournaments.filter(t => t.division === divFilter);
+  }
   if (!tournaments.length) return "";
 
   let html = "";
