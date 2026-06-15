@@ -127,13 +127,13 @@ export function initTournament() {
       await Promise.all(scheduleWrites);
       console.log(`Added ${scheduleWrites.length} matches to schedule`);
 
-      msg.textContent = `✅ Tournament created! ${scheduleWrites.length} Round 1 matches added to Schedule.`;
+      msg.textContent = `Tournament created! ${scheduleWrites.length} Round 1 matches added to Schedule.`;
       msg.className = "msg-ok";
       e.target.reset();
       document.getElementById("tourney-seeds").innerHTML = "";
     } catch (err) {
       console.error("Error:", err);
-      msg.textContent = `❌ Error: ${err.message}`;
+      msg.textContent = `Error: ${err.message}`;
       msg.className = "msg-err";
     }
   });
@@ -154,10 +154,10 @@ function renderTourneyList() {
   if (!tournaments.length) { el.innerHTML = "<p>No tournaments yet.</p>"; return; }
   const isAdmin = getIsAdmin();
   el.innerHTML = tournaments.map(t => {
-    const status = t.status === "active" ? "🟢 In Progress" : "✅ Completed";
-    const champ  = t.champion ? `<br>🏆 Champion: <b>${t.champion}</b>` : "";
+    const status = t.status === "active" ? "Active - In Progress" : "Done - Completed";
+    const champ  = t.champion ? `<br>Champion: <b>${t.champion}</b>` : "";
     const delBtn = isAdmin
-      ? `<button class="btn-sm" style="color:#C0392B;border-color:#C0392B;float:right;padding:4px 10px" onclick="event.stopPropagation();window._deleteTournament('${t.id}')">🗑 Delete</button>`
+      ? `<button class="btn-sm" style="color:#C0392B;border-color:#C0392B;float:right;padding:4px 10px" onclick="event.stopPropagation();window._deleteTournament('${t.id}')">Delete</button>`
       : "";
     return `<div class="tourney-card" onclick="window._viewBracket('${t.id}')">
       ${delBtn}
@@ -211,12 +211,12 @@ window._viewBracket = (id) => {
   let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
     <h3>${t.name} <small style="color:#757575">${t.date}</small></h3>
     <div style="display:flex;gap:8px">
-      ${isAdmin ? `<button class="btn-sm" style="color:#C0392B;border-color:#C0392B" onclick="window._deleteTournament('${t.id}')">🗑 Delete Tournament</button>` : ""}
-      <button class="btn-sm" onclick="document.getElementById('bracket-view').classList.add('hidden');window._activeTournamentId=null">✕ Close</button>
+      ${isAdmin ? `<button class="btn-sm" style="color:#C0392B;border-color:#C0392B" onclick="window._deleteTournament('${t.id}')">Delete Tournament</button>` : ""}
+      <button class="btn-sm" onclick="document.getElementById('bracket-view').classList.add('hidden');window._activeTournamentId=null">x Close</button>
     </div>
   </div>`;
 
-  if (t.champion) html += `<div class="tourney-champion">🏆 Champion: ${t.champion}</div>`;
+  if (t.champion) html += `<div class="tourney-champion">Champion: ${t.champion}</div>`;
   html += `<div class="bracket">`;
 
   for (let r = 0; r < t.numRounds; r++) {

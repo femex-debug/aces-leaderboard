@@ -1,6 +1,7 @@
 // ── Schedule Module ──
 import { db, collection, addDoc, deleteDoc, doc, setDoc, onSnapshot } from "./firebase.js";
 import { getIsAdmin } from "./admin.js";
+import { renderRRSchedule } from "./roundrobin.js";
 
 let scheduled = [];
 
@@ -48,7 +49,7 @@ export function initSchedule() {
     }
 
     await addDoc(collection(db, "scheduled"), data);
-    msg.textContent = "✅ Match scheduled!"; msg.className = "msg-ok";
+    msg.textContent = "Match scheduled!"; msg.className = "msg-ok";
     e.target.reset();
   });
 }
@@ -65,22 +66,48 @@ function renderScheduleList() {
     const players = s.matchType === "doubles"
       ? `${s.team1a} & ${s.team1b} vs ${s.team2a} & ${s.team2b}`
       : `${s.player1} vs ${s.player2}`;
-    const tag = s.matchType === "doubles" ? " 🏸" : "";
+    const tag = s.matchType === "doubles" ? " Doubles" : "";
     const court = s.court ? ` • ${s.court}` : "";
     const tournamentBadge = s.source === "tournament"
       ? `<span style="background:#0F2D18;color:#C9A84C;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;margin-left:6px">${s.tournamentName || "Tournament"} • ${s.round || "Round 1"}</span>`
       : "";
     const cancelBtn = getIsAdmin() ? `<button class="btn-sm" onclick="window._cancelMatch('${s.id}')">Cancel</button>` : "";
+    const submitScoreBtn = !getIsAdmin() && s.source !== "tournament"
+      ? `<button class="btn-secondary btn-xs" onclick="window._submitScheduledScore('${s.id}','${(s.player1||"").replace(/'/g,"\\'")}','${(s.player2||"").replace(/'/g,"\\'")}')">Submit Score</button>`
+      : "";
     return `<li>
       <div><b>${players}</b>${tag}${tournamentBadge}</div>
       <div class="match-meta">${dateStr} at ${timeStr}${court}</div>
-      ${cancelBtn}
+      <div style="display:flex;gap:6px">${cancelBtn}${submitScoreBtn}</div>
     </li>`;
   }).join("");
+
+  // Append round robin weekly matchups
+  const rrEl = document.getElementById("rr-schedule-section");
+  if (rrEl) rrEl.innerHTML = renderRRSchedule();
 }
 
 window._cancelMatch = async (id) => {
   if (confirm("Cancel this scheduled match?")) await deleteDoc(doc(db, "scheduled", id));
+};
+
+// Player submits score for a scheduled match — goes to pending for admin approval
+window._submitScheduledScore = async (schedId, p1, p2) => {
+  const score = prompt(`Enter score for ${p1} vs ${p2}\nFormat: 6-3, 6-4`);
+  if (!score || !score.trim()) return;
+  try {
+    await addDoc(collection(db, "pending_matches"), {
+      player1: p1,
+      player2: p2,
+      score: score.trim(),
+      scheduledMatchId: schedId,
+      submittedAt: new Date().toISOString(),
+      status: "pending"
+    });
+    alert("Score submitted! Awaiting admin approval.");
+  } catch (err) {
+    alert("Error submitting score: " + err.message);
+  }
 };
 
 function renderPendingInScoreTab() {
@@ -132,10 +159,9 @@ window._enterScoreFor = (id) => {
 };
 
 // After match form submit, mark scheduled match as done
-const origSubmit = document.getElementById("match-form");
-origSubmit.addEventListener("submit", async () => {
+document.getElementById("match-form").addEventListener("submit", () => {
   if (window._pendingScheduleId) {
-    await setDoc(doc(db, "scheduled", window._pendingScheduleId), { status: "completed" }, { merge: true });
+    setDoc(doc(db, "scheduled", window._pendingScheduleId), { status: "completed" }, { merge: true });
     window._pendingScheduleId = null;
   }
-}, true);
+});

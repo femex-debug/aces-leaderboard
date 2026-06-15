@@ -104,7 +104,7 @@ export function renderSkillAssignment() {
 
   if (unassigned.length) {
     html += `<div class="info-banner" style="margin-bottom:12px">
-      <span class="info-icon">⚠️</span>
+      <span class="info-icon">!</span>
       ${unassigned.length} player${unassigned.length>1?"s":""} still need a skill level assigned.
     </div>`;
   }

@@ -171,7 +171,7 @@ export async function addPlayerToRoundRobin(playerName, division) {
   const grp = grpA.length <= grpB.length ? "A" : "B";
   const existingPlayers = grp === "A" ? grpA : grpB;
 
-  // Distribute new matchups starting from week 1 across existing weeks
+  // New player matchups start from week 1 (index 0) so they catch up
   const existingWeekCount = t.schedule?.[`${grp}_weekCount`] || 0;
 
   const newSchedule = { ...t.schedule };
@@ -183,18 +183,17 @@ export async function addPlayerToRoundRobin(playerName, division) {
     matchups.push({ p1: p, p2: playerName });
   });
 
-  // Spread matchups across weeks starting from week 0 (1 match per week)
-  const totalWeeks = Math.max(existingWeekCount, matchups.length);
+  // Distribute 2 matchups per week, starting from week 0
   for (let idx = 0; idx < matchups.length; idx++) {
-    const wi = idx % totalWeeks;
-    // Find next available match slot in this week
+    const wi = Math.floor(idx / 2); // 2 matches per week
     const currentCount = newSchedule[`${grp}_w${wi}_count`] || 0;
     newSchedule[`${grp}_w${wi}_m${currentCount}`] = matchups[idx];
     newSchedule[`${grp}_w${wi}_count`] = currentCount + 1;
   }
-  // Ensure weekCount covers any new weeks added
-  if (totalWeeks > existingWeekCount) {
-    newSchedule[`${grp}_weekCount`] = totalWeeks;
+  // Extend weekCount if new player needs more weeks than exist
+  const neededWeeks = Math.ceil(matchups.length / 2);
+  if (neededWeeks > existingWeekCount) {
+    newSchedule[`${grp}_weekCount`] = neededWeeks;
   }
 
   // Update playerMap
@@ -308,7 +307,7 @@ window._rrSubmitScore = async (rrId, group, p1, p2) => {
       submittedAt: new Date().toISOString(),
       status: "pending"
     });
-    alert("✅ Score submitted! Awaiting admin approval.");
+    alert("Score submitted! Awaiting admin approval.");
   } catch (err) {
     alert("Error submitting: " + err.message);
   }
@@ -511,6 +510,10 @@ export function renderRRPage() {
   if (!container) return;
   const isAdmin = getIsAdmin();
 
+  // Also update RR matchups in the Schedule tab
+  const rrSchedEl = document.getElementById("rr-schedule-section");
+  if (rrSchedEl) rrSchedEl.innerHTML = renderRRSchedule();
+
   let html = "";
 
   if (isAdmin) {
@@ -546,7 +549,7 @@ export function renderRRPage() {
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:11px;color:rgba(255,255,255,0.5);font-family:Inter,sans-serif">Started ${t.startDate}</span>
-        ${isAdmin ? `<button class="btn-sm" style="background:rgba(214,48,49,0.15);border-color:rgba(214,48,49,0.3);color:#FF8080" onclick="window._rrDelete('${t.id}')">🗑 Delete</button>` : ""}
+        ${isAdmin ? `<button class="btn-sm" style="background:rgba(214,48,49,0.15);border-color:rgba(214,48,49,0.3);color:#FF8080" onclick="window._rrDelete('${t.id}')">Delete</button>` : ""}
       </div>
     </div>`;
 
@@ -584,27 +587,6 @@ export function renderRRPage() {
         </tr>`;
       });
       html += `</table>`;
-
-      // Weekly matchups
-      const weekly = getWeeklySchedule(t, grp);
-      if (weekly.length) {
-        weekly.forEach((weekMatches,wi) => {
-          html += `<div class="rr-week-label">Week ${wi+1}</div>`;
-          weekMatches.forEach(matchup => {
-            const mp1 = matchup.p1 || (Array.isArray(matchup) ? matchup[0] : "");
-            const mp2 = matchup.p2 || (Array.isArray(matchup) ? matchup[1] : "");
-            if (!mp1 || !mp2) return;
-            const played = (Object.values(t.matchLog||{}) ).some(m =>
-              !m.isSemiFinal && !m.isFinal && m.group===grp &&
-              ((m.p1===mp1&&m.p2===mp2)||(m.p1===mp2&&m.p2===mp1))
-            );
-            html += `<div class="rr-matchup${played?" played":""}">
-              <span style="font-size:12px">${played?"<span class=\'done-tag\'>Done</span> ":""}${mp1} <span class=\'vs-sep\'>vs</span> ${mp2}</span>
-              ${!played && t.status==="active" ? (isAdmin ? `<button class="btn-secondary btn-xs" onclick="window._rrEnterScore('${t.id}','${grp}','${mp1}','${mp2}')">Score</button>` : `<button class="btn-secondary btn-xs" onclick="window._rrSubmitScore('${t.id}','${grp}','${mp1}','${mp2}')">Submit Score</button>`) : ""}
-            </div>`;
-          });
-        });
-      }
 
       // Match history
       const history = Object.values(t.matchLog||{}).filter(m => m.group===grp && !m.isSemiFinal && !m.isFinal);
@@ -652,7 +634,7 @@ export function renderRRPage() {
     const hasSemis = semis?.semi1?.p1 && semis?.semi2?.p1;
 
     html += `</div><div class="rr-knockout">`;
-    html += `<div class="rr-knockout-title">🏆 Knockout Stage</div>`;
+    html += `<div class="rr-knockout-title">Knockout Stage</div>`;
     html += `<div class="semi-grid">`;
 
     const s1p1 = hasSemis ? semis.semi1.p1 : "TBD";
@@ -665,14 +647,14 @@ export function renderRRPage() {
     html += `<div class="semi-card">
       <div class="semi-label">Semifinal 1 — A1 vs B2</div>
       <div class="semi-matchup">${s1p1} vs ${s1p2}</div>
-      ${s1?.winner ? `<div class="semi-result">✅ ${s1.winner} advances</div>` : (isAdmin && hasSemis && t.status==="active" ? `<button class="btn-secondary btn-xs" style="margin-top:8px" onclick="window._rrEnterKnockoutScore('${t.id}','semifinal','semi1','${s1p1}','${s1p2}')">Enter Score</button>` : "")}
+      ${s1?.winner ? `<div class="semi-result">${s1.winner} advances</div>` : (isAdmin && hasSemis && t.status==="active" ? `<button class="btn-secondary btn-xs" style="margin-top:8px" onclick="window._rrEnterKnockoutScore('${t.id}','semifinal','semi1','${s1p1}','${s1p2}')">Enter Score</button>` : "")}
     </div>`;
 
     // Semi 2
     html += `<div class="semi-card">
       <div class="semi-label">Semifinal 2 — B1 vs A2</div>
       <div class="semi-matchup">${s2p1} vs ${s2p2}</div>
-      ${s2?.winner ? `<div class="semi-result">✅ ${s2.winner} advances</div>` : (isAdmin && hasSemis && t.status==="active" ? `<button class="btn-secondary btn-xs" style="margin-top:8px" onclick="window._rrEnterKnockoutScore('${t.id}','semifinal','semi2','${s2p1}','${s2p2}')">Enter Score</button>` : "")}
+      ${s2?.winner ? `<div class="semi-result">${s2.winner} advances</div>` : (isAdmin && hasSemis && t.status==="active" ? `<button class="btn-secondary btn-xs" style="margin-top:8px" onclick="window._rrEnterKnockoutScore('${t.id}','semifinal','semi2','${s2p1}','${s2p2}')">Enter Score</button>` : "")}
     </div>`;
     html += `</div>`;
 
@@ -704,3 +686,49 @@ export function renderRRPage() {
 }
 
 window._rrCreate = (division) => createRoundRobin(division);
+
+// ── RR SCHEDULE for the Schedule tab ──
+export function renderRRSchedule() {
+  const isAdmin = getIsAdmin();
+  const tournaments = Object.values(rrTournaments).filter(t => t.status === "active");
+  if (!tournaments.length) return "";
+
+  let html = "";
+  tournaments.forEach(t => {
+    html += `<div class="form-card" style="margin-bottom:16px">
+      <div class="form-card-title">${t.division.toUpperCase()} Round Robin — Weekly Matchups</div>`;
+
+    ["A","B"].forEach(grp => {
+      const groupPlayers = getGroupPlayers(t, grp);
+      if (!groupPlayers.length) return;
+      const weekly = getWeeklySchedule(t, grp);
+      if (!weekly.length) return;
+
+      html += `<div class="rr-group-title" style="margin-top:12px">Group ${grp}</div>`;
+      weekly.forEach((weekMatches, wi) => {
+        html += `<div class="rr-week-label">Week ${wi+1}</div>`;
+        weekMatches.forEach(matchup => {
+          const mp1 = matchup.p1 || "";
+          const mp2 = matchup.p2 || "";
+          if (!mp1 || !mp2) return;
+          const played = (Object.values(t.matchLog||{})).some(m =>
+            !m.isSemiFinal && !m.isFinal && m.group===grp &&
+            ((m.p1===mp1&&m.p2===mp2)||(m.p1===mp2&&m.p2===mp1))
+          );
+          const scoreBtn = !played && t.status==="active"
+            ? (isAdmin
+              ? `<button class="btn-secondary btn-xs" onclick="window._rrEnterScore('${t.id}','${grp}','${mp1}','${mp2}')">Score</button>`
+              : `<button class="btn-secondary btn-xs" onclick="window._rrSubmitScore('${t.id}','${grp}','${mp1}','${mp2}')">Submit Score</button>`)
+            : "";
+          html += `<div class="rr-matchup${played?" played":""}">
+            <span style="font-size:12px">${played?"<span class='done-tag'>Done</span> ":""}${mp1} <span class='vs-sep'>vs</span> ${mp2}</span>
+            ${scoreBtn}
+          </div>`;
+        });
+      });
+    });
+
+    html += `</div>`;
+  });
+  return html;
+}

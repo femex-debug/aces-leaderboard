@@ -72,7 +72,7 @@ function initPublicMatchForm() {
         submittedAt: new Date().toISOString(),
         status: "pending"
       });
-      msg.textContent = "✅ Score submitted! Awaiting admin approval.";
+      msg.textContent = "Score submitted! Awaiting admin approval.";
       msg.className = "msg-ok";
       form.reset();
     } catch (err) {
@@ -111,7 +111,7 @@ function initPublicPlayerForm() {
         submittedAt: new Date().toISOString(),
         status: "pending"
       });
-      msg.textContent = "✅ Registration submitted! Admin will approve shortly.";
+      msg.textContent = "Registration submitted! Admin will approve shortly.";
       msg.className = "msg-ok";
       form.reset();
     } catch (err) {
@@ -142,8 +142,8 @@ function renderPendingQueue() {
           <div style="font-size:12px;color:#666">Score: ${m.score} &bull; Submitted ${d}</div>
         </div>
         <div style="display:flex;gap:8px">
-          <button class="btn-secondary btn-sm" onclick="window._approveMatch('${m.id}')">✅ Approve</button>
-          <button class="btn-danger btn-sm" onclick="window._rejectMatch('${m.id}')">✕ Reject</button>
+          <button class="btn-secondary btn-sm" onclick="window._approveMatch('${m.id}')">Approve</button>
+          <button class="btn-danger btn-sm" onclick="window._rejectMatch('${m.id}')">x Reject</button>
         </div>
       </div>`;
     });
@@ -162,8 +162,8 @@ function renderPendingQueue() {
           <div style="font-size:12px;color:#666">${p.division.toUpperCase()} &bull; Submitted ${d}</div>
         </div>
         <div style="display:flex;gap:8px">
-          <button class="btn-sm" style="color:#27500a;border-color:#27500a" onclick="window._approvePlayer('${p.id}')">✅ Approve</button>
-          <button class="btn-sm" style="color:#C0392B;border-color:#C0392B" onclick="window._rejectPlayer('${p.id}')">✕ Reject</button>
+          <button class="btn-sm" style="color:#27500a;border-color:#27500a" onclick="window._approvePlayer('${p.id}')">Approve</button>
+          <button class="btn-sm" style="color:#C0392B;border-color:#C0392B" onclick="window._rejectPlayer('${p.id}')">x Reject</button>
         </div>
       </div>`;
     });

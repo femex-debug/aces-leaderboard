@@ -12,7 +12,7 @@ function showAdminUI(show) {
   document.getElementById("admin-bar").classList.toggle("hidden", !show);
   // Show admin-only tabs and elements
   document.querySelectorAll(".admin-only").forEach(el => el.classList.toggle("hidden", !show));
-  document.getElementById("admin-toggle").textContent = show ? "🔓" : "🔒";
+  document.getElementById("admin-toggle").textContent = show ? "Unlock" : "Admin";
 }
 
 export function initAdmin() {
@@ -89,7 +89,7 @@ async function initSeasonManagement() {
       const label = document.getElementById("current-season-label");
       if (label) label.textContent = `Season ${newNum}`;
 
-      msg.textContent = `✅ Season ${newNum} started. Leaderboard is now fresh.`;
+      msg.textContent = `Season ${newNum} started. Leaderboard is now fresh.`;
       msg.className = "msg-ok";
     } catch(err) {
       msg.textContent = "Error: " + err.message;

@@ -145,7 +145,7 @@ function initMatchForm() {
     try {
       await addDoc(collection(db, "matches"), matchData);
       const winnerName = getWinnerName(matchData);
-      msg.textContent = `✅ ${winnerName} wins!`; msg.className = "msg-ok";
+      msg.textContent = `${winnerName} wins!`; msg.className = "msg-ok";
       e.target.reset();
       while (setCount > 1) { container.removeChild(container.lastElementChild); setCount--; }
     } catch (err) {
@@ -175,10 +175,10 @@ function renderRecent() {
   const last15 = allMatches.slice(-15).reverse();
   list.innerHTML = last15.map(m => {
     const date = m.date ? new Date(m.date).toLocaleDateString() : "";
-    const tag = m.matchType === "doubles" ? " 🏸 Doubles" : "";
+    const tag = m.matchType === "doubles" ? " Doubles" : "";
     const rt = m.resultType && m.resultType !== "completed" ? ` (${m.resultType.toUpperCase()})` : "";
     return `<li>
-      <div><span class="match-players"><span class="winner-badge">✓ ${getWinnerName(m)}</span> def. ${getLoserName(m)}${rt}</span></div>
+      <div><span class="match-players"><span class="winner-badge">W ${getWinnerName(m)}</span> def. ${getLoserName(m)}${rt}</span></div>
       <span class="match-score">${formatSets(m.sets)}</span>
       <div class="match-meta">${date}${tag}</div>
     </li>`;
