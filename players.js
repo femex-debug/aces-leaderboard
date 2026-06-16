@@ -28,6 +28,7 @@ export function initPlayers() {
     if (!name) return;
     if (playersList.find(p => p.name.toLowerCase() === name.toLowerCase())) { alert("Player already exists."); return; }
     await addDoc(collection(db, "players"), { name, division });
+    if (onPlayerSkillSetCallback) onPlayerSkillSetCallback(name, division);
     document.getElementById("new-player-name").value = "";
   });
 }
