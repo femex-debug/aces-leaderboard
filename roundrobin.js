@@ -12,16 +12,14 @@ function showScoreModal(p1, p2, onSubmit) {
   const modal = document.getElementById("score-modal");
   const title = document.getElementById("score-modal-title");
   const sub = document.getElementById("score-modal-sub");
-  const inp1 = document.getElementById("score-modal-p1");
-  const inp2 = document.getElementById("score-modal-p2");
   const msg = document.getElementById("score-modal-msg");
 
   title.textContent = `${p1} vs ${p2}`;
-  sub.textContent = `Enter sets won by each player`;
-  inp1.value = ""; inp2.value = ""; msg.textContent = "";
-  inp1.placeholder = p1; inp2.placeholder = p2;
+  sub.textContent = `Enter game scores for each set`;
+  msg.textContent = "";
+  // Clear inputs
+  document.querySelectorAll(".sm-p1, .sm-p2").forEach(i => i.value = "");
   modal.classList.remove("hidden");
-  inp1.focus();
 
   const submitBtn = document.getElementById("score-modal-submit");
   const cancelBtn = document.getElementById("score-modal-cancel");
@@ -33,12 +31,19 @@ function showScoreModal(p1, p2, onSubmit) {
   }
 
   document.getElementById("score-modal-submit").addEventListener("click", () => {
-    const s1 = parseInt(inp1.value), s2 = parseInt(inp2.value);
-    if (isNaN(s1) || isNaN(s2) || s1 === s2 || s1 < 0 || s2 < 0) {
-      msg.textContent = "Enter valid scores (can't be equal)"; msg.className = "form-msg msg-err"; return;
+    const p1Inputs = document.querySelectorAll(".sm-p1");
+    const p2Inputs = document.querySelectorAll(".sm-p2");
+    const sets = [];
+    for (let i = 0; i < p1Inputs.length; i++) {
+      const a = parseInt(p1Inputs[i].value), b = parseInt(p2Inputs[i].value);
+      if (isNaN(a) && isNaN(b)) continue; // skip empty sets
+      if (isNaN(a) || isNaN(b)) { msg.textContent = "Fill in both scores for each set"; msg.className = "form-msg msg-err"; return; }
+      if (a === b) { msg.textContent = "Set scores can't be equal"; msg.className = "form-msg msg-err"; return; }
+      sets.push({ p1: a, p2: b, tb: null });
     }
+    if (!sets.length) { msg.textContent = "Enter at least one set"; msg.className = "form-msg msg-err"; return; }
     cleanup();
-    onSubmit(s1, s2);
+    onSubmit(sets);
   });
   document.getElementById("score-modal-cancel").addEventListener("click", cleanup);
 }
@@ -265,25 +270,33 @@ export async function addPlayerToRoundRobin(playerName, division) {
 
 
 window._rrEnterScore = (rrId, group, p1, p2) => {
-  showScoreModal(p1, p2, async (p1Sets, p2Sets) => {
+  showScoreModal(p1, p2, async (sets) => {
     const t = rrTournaments[rrId];
     if (!t) return;
 
-    const winner = p1Sets > p2Sets ? p1 : p2;
+    // Determine winner by sets won
+    let p1SetsWon = 0, p2SetsWon = 0, p1Games = 0, p2Games = 0;
+    sets.forEach(s => {
+      p1Games += s.p1; p2Games += s.p2;
+      if (s.p1 > s.p2) p1SetsWon++; else p2SetsWon++;
+    });
+    const winner = p1SetsWon >= p2SetsWon ? p1 : p2;
 
     const st = JSON.parse(JSON.stringify(t.standings || {}));
     const k1 = `${group}_${p1.replace(/[.#$\[\]/]/g,"_")}`;
     const k2 = `${group}_${p2.replace(/[.#$\[\]/]/g,"_")}`;
-    if (!st[k1]) st[k1] = { name: p1, group, played:0, setWins:0, setLosses:0, matchWins:0 };
-    if (!st[k2]) st[k2] = { name: p2, group, played:0, setWins:0, setLosses:0, matchWins:0 };
+    if (!st[k1]) st[k1] = { name: p1, group, played:0, setWins:0, setLosses:0, gamesWon:0, gamesLost:0, matchWins:0 };
+    if (!st[k2]) st[k2] = { name: p2, group, played:0, setWins:0, setLosses:0, gamesWon:0, gamesLost:0, matchWins:0 };
     st[k1].played++;  st[k2].played++;
-    st[k1].setWins += p1Sets; st[k1].setLosses += p2Sets;
-    st[k2].setWins += p2Sets; st[k2].setLosses += p1Sets;
-    if (p1Sets > p2Sets) st[k1].matchWins++;
-    else st[k2].matchWins++;
+    st[k1].setWins += p1SetsWon; st[k1].setLosses += p2SetsWon;
+    st[k2].setWins += p2SetsWon; st[k2].setLosses += p1SetsWon;
+    st[k1].gamesWon = (st[k1].gamesWon || 0) + p1Games; st[k1].gamesLost = (st[k1].gamesLost || 0) + p2Games;
+    st[k2].gamesWon = (st[k2].gamesWon || 0) + p2Games; st[k2].gamesLost = (st[k2].gamesLost || 0) + p1Games;
+    if (winner === p1) st[k1].matchWins++; else st[k2].matchWins++;
 
+  const scoreStr = sets.map(s => `${s.p1}-${s.p2}`).join(', ');
   const matchRecord = {
-    group, p1, p2, p1Sets, p2Sets, winner,
+    group, p1, p2, sets, p1SetsWon, p2SetsWon, p1Games, p2Games, winner, score: scoreStr,
     date: new Date().toISOString()
   };
 
@@ -309,8 +322,8 @@ window._rrEnterScore = (rrId, group, p1, p2) => {
       division: t.division,
       player1: p1,
       player2: p2,
-      winner: p1Sets > p2Sets ? 1 : 2,
-      sets: [{ p1: p1Sets, p2: p2Sets, tb: null }],
+      winner: winner === p1 ? 1 : 2,
+      sets: sets,
       resultType: "completed",
       source: "roundrobin",
       rrId,
@@ -332,16 +345,17 @@ window._rrEnterScoreFromApproval = async (rrId, group, p1, p2, p1Sets, p2Sets) =
   const t = rrTournaments[rrId];
   if (!t) return;
 
+  // p1Sets/p2Sets here come from the approval parsing (sets won count)
   const winner = p1Sets > p2Sets ? p1 : p2;
   const st = JSON.parse(JSON.stringify(t.standings || {}));
   const k1 = `${group}_${p1.replace(/[.#$\[\]/]/g,"_")}`;
   const k2 = `${group}_${p2.replace(/[.#$\[\]/]/g,"_")}`;
-  if (!st[k1]) st[k1] = { name: p1, group, played:0, setWins:0, setLosses:0, matchWins:0 };
-  if (!st[k2]) st[k2] = { name: p2, group, played:0, setWins:0, setLosses:0, matchWins:0 };
+  if (!st[k1]) st[k1] = { name: p1, group, played:0, setWins:0, setLosses:0, gamesWon:0, gamesLost:0, matchWins:0 };
+  if (!st[k2]) st[k2] = { name: p2, group, played:0, setWins:0, setLosses:0, gamesWon:0, gamesLost:0, matchWins:0 };
   st[k1].played++; st[k2].played++;
   st[k1].setWins += p1Sets; st[k1].setLosses += p2Sets;
   st[k2].setWins += p2Sets; st[k2].setLosses += p1Sets;
-  if (p1Sets > p2Sets) st[k1].matchWins++; else st[k2].matchWins++;
+  if (winner === p1) st[k1].matchWins++; else st[k2].matchWins++;
 
   const matchKey = `match_${Date.now()}`;
   const updatedMatchLog = { ...(t.matchLog || {}), [matchKey]: {
@@ -366,12 +380,13 @@ window._rrEnterScoreFromApproval = async (rrId, group, p1, p2, p1Sets, p2Sets) =
 
 // Player submits RR score — goes to pending for admin approval
 window._rrSubmitScore = (rrId, group, p1, p2) => {
-  showScoreModal(p1, p2, async (p1Sets, p2Sets) => {
+  showScoreModal(p1, p2, async (sets) => {
     try {
+      const scoreStr = sets.map(s => `${s.p1}-${s.p2}`).join(', ');
       await addDoc(collection(db, "pending_matches"), {
         player1: p1,
         player2: p2,
-        score: `${p1Sets}-${p2Sets}`,
+        score: scoreStr,
         source: "roundrobin",
         rrId,
         rrGroup: group,
@@ -567,11 +582,10 @@ function getWeeklySchedule(t, grp) {
 function getTopTwo(standing) {
   return Object.values(standing)
     .sort((a, b) => {
-      const aName = a.name || a; const bName = b.name || b;
-      const sa = typeof a === 'object' ? a : {setWins:0,setLosses:0,matchWins:0};
-      const sb = typeof b === 'object' ? b : {setWins:0,setLosses:0,matchWins:0};
-      if (sb.setWins !== sa.setWins) return sb.setWins - sa.setWins;
-      return (sb.setWins - sb.setLosses) - (sa.setWins - sa.setLosses);
+      const sa = typeof a === 'object' ? a : {matchWins:0,played:0,gamesWon:0,gamesLost:0};
+      const sb = typeof b === 'object' ? b : {matchWins:0,played:0,gamesWon:0,gamesLost:0};
+      if (sb.matchWins !== sa.matchWins) return sb.matchWins - sa.matchWins;
+      return ((sb.gamesWon||0) - (sb.gamesLost||0)) - ((sa.gamesWon||0) - (sa.gamesLost||0));
     })
     .slice(0, 2)
     .map(s => s.name || s);
@@ -639,10 +653,13 @@ export function renderRRPage() {
       if (!groupPlayers.length) return;
 
       const sorted = [...groupPlayers].sort((a,b) => {
-        const sa = standing[a] || {setWins:0,setLosses:0,matchWins:0};
-        const sb = standing[b] || {setWins:0,setLosses:0,matchWins:0};
-        if (sb.setWins !== sa.setWins) return sb.setWins - sa.setWins;
-        return (sb.setWins-sb.setLosses) - (sa.setWins-sa.setLosses);
+        const sa = standing[a] || {setWins:0,setLosses:0,matchWins:0,played:0};
+        const sb = standing[b] || {setWins:0,setLosses:0,matchWins:0,played:0};
+        if (sb.matchWins !== sa.matchWins) return sb.matchWins - sa.matchWins;
+        const aPct = sa.played ? sa.matchWins / sa.played : 0;
+        const bPct = sb.played ? sb.matchWins / sb.played : 0;
+        if (bPct !== aPct) return bPct - aPct;
+        return (sb.gamesWon||0) - (sb.gamesLost||0) - ((sa.gamesWon||0) - (sa.gamesLost||0));
       });
 
       html += `<div>`;
@@ -650,16 +667,18 @@ export function renderRRPage() {
 
       // Standings table
       html += `<table class="rr-table" style="margin-bottom:12px">`;
-      html += `<tr><th style="text-align:left">Player</th><th>SW</th><th>SL</th><th>W</th></tr>`;
+      html += `<tr><th style="text-align:left">Player</th><th>W</th><th>L</th><th>MP</th><th>Sets W/L</th></tr>`;
       sorted.forEach((p,i) => {
         const raw = standing[p] || {};
-        const s = {setWins: raw.setWins||0, setLosses: raw.setLosses||0, matchWins: raw.matchWins||0, played: raw.played||0};
+        const s = {played: raw.played||0, matchWins: raw.matchWins||0, setWins: raw.setWins||0, setLosses: raw.setLosses||0};
+        const losses = s.played - s.matchWins;
         const isTop = i < 2 && s.played > 0;
         html += `<tr class="${isTop?"top-row":""}">
-          <td>${isTop?"":""}${p}</td>
-          <td>${s.setWins}</td>
-          <td>${s.setLosses}</td>
+          <td>${p}</td>
           <td>${s.matchWins}</td>
+          <td>${losses}</td>
+          <td>${s.played}</td>
+          <td>${s.setWins}/${s.setLosses}</td>
         </tr>`;
       });
       html += `</table>`;
@@ -670,9 +689,10 @@ export function renderRRPage() {
         html += `<div class="rr-week-label" style="margin-top:10px">Match History</div>`;
         history.slice().reverse().forEach(m => {
           const d = m.date ? new Date(m.date).toLocaleDateString() : "";
+          const scoreDisplay = m.score || (m.sets ? m.sets.map(s=>`${s.p1}-${s.p2}`).join(', ') : `${m.p1Sets||0}-${m.p2Sets||0}`);
           html += `<div style="font-size:11px;color:var(--text-2);padding:3px 0;font-family:Inter,sans-serif">
             <span style="color:var(--green);font-weight:600">${m.winner}</span> def. ${m.p1===m.winner?m.p2:m.p1}
-            <span style="background:var(--gold-pale);border-radius:10px;padding:1px 7px;font-size:10px;color:#7A5C00;margin:0 4px">${m.p1Sets}-${m.p2Sets}</span>
+            <span style="background:var(--gold-pale);border-radius:10px;padding:1px 7px;font-size:10px;color:#7A5C00;margin:0 4px">${scoreDisplay}</span>
             <span style="color:var(--muted)">${d}</span>
           </div>`;
         });

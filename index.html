@@ -511,18 +511,12 @@
     <div class="modal-box">
       <h3 id="score-modal-title">Enter Score</h3>
       <p class="modal-sub" id="score-modal-sub"></p>
-      <div class="form-grid-2" style="margin:16px 0">
-        <div class="form-row">
-          <label>Player 1 Sets
-            <input type="number" id="score-modal-p1" min="0" max="9" placeholder="0">
-          </label>
-        </div>
-        <div class="form-row">
-          <label>Player 2 Sets
-            <input type="number" id="score-modal-p2" min="0" max="9" placeholder="0">
-          </label>
-        </div>
+      <div id="score-modal-sets" style="margin:16px 0">
+        <div class="set-row"><span class="set-label">Set 1</span><input type="number" min="0" max="7" class="sm-p1" placeholder="P1"><span class="set-dash">–</span><input type="number" min="0" max="7" class="sm-p2" placeholder="P2"></div>
+        <div class="set-row"><span class="set-label">Set 2</span><input type="number" min="0" max="7" class="sm-p1" placeholder="P1"><span class="set-dash">–</span><input type="number" min="0" max="7" class="sm-p2" placeholder="P2"></div>
+        <div class="set-row"><span class="set-label">Set 3</span><input type="number" min="0" max="7" class="sm-p1" placeholder="P1"><span class="set-dash">–</span><input type="number" min="0" max="7" class="sm-p2" placeholder="P2"></div>
       </div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Enter game scores for each set played. Leave blank sets empty.</p>
       <div class="btn-row">
         <button id="score-modal-submit" class="btn-primary" style="flex:1">Submit</button>
         <button id="score-modal-cancel" class="btn-secondary">Cancel</button>
