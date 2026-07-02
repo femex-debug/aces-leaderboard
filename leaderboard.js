@@ -193,9 +193,9 @@ export function computeMVP() {
     losers.filter(Boolean).forEach(n => { if (stats[n]) stats[n].losses++; });
   });
 
-  // Find top player in each division (min 3 matches, sorted by wins)
-  const beginners = Object.entries(stats).filter(([n,s]) => (s.division||'').toLowerCase() === 'beginner' && (s.wins+s.losses) >= 3).sort((a,b) => b[1].wins - a[1].wins);
-  const experienced = Object.entries(stats).filter(([n,s]) => (s.division||'').toLowerCase() === 'experienced' && (s.wins+s.losses) >= 3).sort((a,b) => b[1].wins - a[1].wins);
+  // Find top player in each division (best record = most wins)
+  const beginners = Object.entries(stats).filter(([n,s]) => (s.division||'').toLowerCase() === 'beginner' && s.wins > 0).sort((a,b) => b[1].wins - a[1].wins || a[1].losses - b[1].losses);
+  const experienced = Object.entries(stats).filter(([n,s]) => (s.division||'').toLowerCase() === 'experienced' && s.wins > 0).sort((a,b) => b[1].wins - a[1].wins || a[1].losses - b[1].losses);
 
   const banner = document.getElementById("mvp-banner");
   if (!banner) return;
