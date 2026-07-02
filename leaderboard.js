@@ -174,29 +174,41 @@ export function initLeaderboard() {
   });
 }
 
-// ── Weekly MVP ──
+// ── Division Leaders ──
 export function computeMVP() {
-  const now = Date.now();
-  const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
-  const recent  = allMatches.filter(m => m.timestamp >= weekAgo);
-  const wins = {};
+  const stats = {};
+  const players = getPlayers();
+  players.forEach(p => { stats[p.name] = { division: p.division, wins: 0, losses: 0 }; });
 
-  recent.forEach(m => {
-    const winners = m.matchType === "doubles"
-      ? (m.winner === 1 ? [m.team1a, m.team1b] : [m.team2a, m.team2b])
-      : [m.winner === 1 ? m.player1 : m.player2];
-    winners.filter(Boolean).forEach(n => { wins[n] = (wins[n] || 0) + 1; });
+  allMatches.forEach(m => {
+    let winners, losers;
+    if (m.matchType === "doubles") {
+      winners = m.winner === 1 ? [m.team1a, m.team1b] : [m.team2a, m.team2b];
+      losers = m.winner === 1 ? [m.team2a, m.team2b] : [m.team1a, m.team1b];
+    } else {
+      winners = [m.winner === 1 ? m.player1 : m.player2];
+      losers = [m.winner === 1 ? m.player2 : m.player1];
+    }
+    winners.filter(Boolean).forEach(n => { if (stats[n]) stats[n].wins++; });
+    losers.filter(Boolean).forEach(n => { if (stats[n]) stats[n].losses++; });
   });
 
-  let mvp = null, maxWins = 0;
-  Object.entries(wins).forEach(([name, w]) => {
-    if (w >= 2 && w > maxWins) { mvp = name; maxWins = w; }
-  });
+  // Find top player in each division (min 3 matches, sorted by wins)
+  const beginners = Object.entries(stats).filter(([n,s]) => (s.division||'').toLowerCase() === 'beginner' && (s.wins+s.losses) >= 3).sort((a,b) => b[1].wins - a[1].wins);
+  const experienced = Object.entries(stats).filter(([n,s]) => (s.division||'').toLowerCase() === 'experienced' && (s.wins+s.losses) >= 3).sort((a,b) => b[1].wins - a[1].wins);
 
   const banner = document.getElementById("mvp-banner");
   if (!banner) return;
-  if (mvp) {
-    banner.innerHTML = `<span class="mvp-crown">MVP</span><span class="mvp-name">${mvp}</span><span class="mvp-stat">${maxWins} wins this week</span>`;
+
+  const topBeg = beginners[0];
+  const topExp = experienced[0];
+
+  if (topBeg || topExp) {
+    let html = '';
+    if (topExp) html += `<span class="mvp-crown">Experienced Leader</span><span class="mvp-name">${topExp[0]}</span><span class="mvp-stat">${topExp[1].wins}W-${topExp[1].losses}L</span>`;
+    if (topExp && topBeg) html += `<span style="margin:0 16px;opacity:0.3">|</span>`;
+    if (topBeg) html += `<span class="mvp-crown">Beginner Leader</span><span class="mvp-name">${topBeg[0]}</span><span class="mvp-stat">${topBeg[1].wins}W-${topBeg[1].losses}L</span>`;
+    banner.innerHTML = html;
     banner.classList.remove("hidden");
   } else {
     banner.classList.add("hidden");

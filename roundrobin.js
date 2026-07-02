@@ -513,7 +513,6 @@ window._rrDelete = async (rrId) => {
   if (!confirm("Delete this round robin tournament? Match history on the leaderboard will be preserved.")) return;
   try {
     await deleteDoc(doc(db, "rr_tournaments", rrId));
-    // Clean up any scheduled entries tied to this tournament
     const schedRef = collection(db, "scheduled");
     const q = query(schedRef, where("tournamentId", "==", rrId));
     const snap = await getDocs(q);
@@ -521,6 +520,86 @@ window._rrDelete = async (rrId) => {
     console.log("Round robin deleted. Match history preserved on leaderboard.");
   } catch (err) {
     alert("Error deleting: " + err.message);
+  }
+};
+
+window._rrRecalculate = async (rrId) => {
+  const t = rrTournaments[rrId];
+  if (!t) return;
+  if (!confirm("Recalculate all standings from match history? This will reset stats and remove old 1-0 scores from the main leaderboard.")) return;
+
+  const matchLog = t.matchLog || {};
+  const matches = Object.values(matchLog).filter(m => !m.isSemiFinal && !m.isFinal && !m.stage);
+
+  // Delete old RR matches from main matches collection (ones with 1-0 format)
+  try {
+    const matchesRef = collection(db, "matches");
+    const q = query(matchesRef, where("source", "==", "roundrobin"), where("rrId", "==", rrId));
+    const snap = await getDocs(q);
+    const toDelete = snap.docs.filter(d => {
+      const data = d.data();
+      // Delete if sets array has only one entry with values like 1-0, 2-0, 2-1 (old format)
+      if (data.sets && data.sets.length === 1) {
+        const s = data.sets[0];
+        if ((s.p1 <= 3 && s.p2 <= 3)) return true; // old set-count format
+      }
+      return false;
+    });
+    await Promise.all(toDelete.map(d => deleteDoc(doc(db, "matches", d.id))));
+    console.log(`Deleted ${toDelete.length} old format matches from main leaderboard`);
+  } catch(e) { console.error("Error cleaning matches:", e); }
+
+  // Reset all standings
+  const st = { ...t.standings };
+  Object.keys(st).forEach(k => {
+    if (typeof st[k] === 'object' && st[k].name) {
+      st[k] = { ...st[k], played: 0, matchWins: 0, setWins: 0, setLosses: 0, gamesWon: 0, gamesLost: 0 };
+    }
+  });
+
+  // Re-process each match — only include ones with proper set data
+  let validCount = 0;
+  matches.forEach(m => {
+    const grp = m.group;
+    const k1 = `${grp}_${m.p1.replace(/[.#$\[\]/]/g,"_")}`;
+    const k2 = `${grp}_${m.p2.replace(/[.#$\[\]/]/g,"_")}`;
+    if (!st[k1]) st[k1] = { name: m.p1, group: grp, played:0, matchWins:0, setWins:0, setLosses:0, gamesWon:0, gamesLost:0 };
+    if (!st[k2]) st[k2] = { name: m.p2, group: grp, played:0, matchWins:0, setWins:0, setLosses:0, gamesWon:0, gamesLost:0 };
+
+    if (m.sets && Array.isArray(m.sets)) {
+      // New format: full set scores — include these
+      st[k1].played++; st[k2].played++;
+      let p1Sets = 0, p2Sets = 0;
+      m.sets.forEach(s => {
+        st[k1].gamesWon = (st[k1].gamesWon||0) + s.p1;
+        st[k1].gamesLost = (st[k1].gamesLost||0) + s.p2;
+        st[k2].gamesWon = (st[k2].gamesWon||0) + s.p2;
+        st[k2].gamesLost = (st[k2].gamesLost||0) + s.p1;
+        if (s.p1 > s.p2) p1Sets++; else p2Sets++;
+      });
+      st[k1].setWins += p1Sets; st[k1].setLosses += p2Sets;
+      st[k2].setWins += p2Sets; st[k2].setLosses += p1Sets;
+      if (p1Sets >= p2Sets) st[k1].matchWins++; else st[k2].matchWins++;
+      validCount++;
+    } else if (m.p1Sets !== undefined && (m.p1Sets > 3 || m.p2Sets > 3)) {
+      // Looks like real game scores logged as p1Sets/p2Sets (e.g. 6-4) — include
+      st[k1].played++; st[k2].played++;
+      st[k1].gamesWon = (st[k1].gamesWon||0) + (m.p1Sets||0);
+      st[k1].gamesLost = (st[k1].gamesLost||0) + (m.p2Sets||0);
+      st[k2].gamesWon = (st[k2].gamesWon||0) + (m.p2Sets||0);
+      st[k2].gamesLost = (st[k2].gamesLost||0) + (m.p1Sets||0);
+      if (m.winner === m.p1) { st[k1].matchWins++; st[k1].setWins++; st[k2].setLosses++; }
+      else { st[k2].matchWins++; st[k2].setWins++; st[k1].setLosses++; }
+      validCount++;
+    }
+    // Skip old 1-0 format matches (p1Sets <= 3 && p2Sets <= 3 without sets array)
+  });
+
+  try {
+    await setDoc(doc(db, "rr_tournaments", rrId), { standings: st }, { merge: true });
+    alert(`Standings recalculated from ${validCount} valid matches. Old 1-0 scores removed from main leaderboard.`);
+  } catch (err) {
+    alert("Error: " + err.message);
   }
 };
 
@@ -639,7 +718,7 @@ export function renderRRPage() {
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:11px;color:rgba(255,255,255,0.5);font-family:Inter,sans-serif">Started ${t.startDate}</span>
-        ${isAdmin ? `<button class="btn-sm" style="background:rgba(214,48,49,0.15);border-color:rgba(214,48,49,0.3);color:#FF8080" onclick="window._rrDelete('${t.id}')">Delete</button>` : ""}
+        ${isAdmin ? `<button class="btn-sm" style="background:rgba(26,122,74,0.15);border-color:rgba(26,122,74,0.3);color:#4CAF50;margin-right:6px" onclick="window._rrRecalculate('${t.id}')">Recalculate</button><button class="btn-sm" style="background:rgba(214,48,49,0.15);border-color:rgba(214,48,49,0.3);color:#FF8080" onclick="window._rrDelete('${t.id}')">Delete</button>` : ""}
       </div>
     </div>`;
 
